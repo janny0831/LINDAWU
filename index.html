@@ -92,16 +92,9 @@
             <!-- Page 2: 日誌 -->
             <div id="page2" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 <div class="overflow-x-auto max-h-[75vh]">
-                    <table class="w-full text-sm text-left">
-                        <thead class="sticky-header text-slate-600">
-                            <tr>
-                                <th class="px-4 py-3 font-bold border-b border-slate-200">異動時間</th>
-                                <th class="px-4 py-3 font-bold border-b border-slate-200">動作</th>
-                                <th class="px-4 py-3 font-bold border-b border-slate-200">單號</th>
-                                <th class="px-4 py-3 font-bold border-b border-slate-200">詳細內容</th>
-                                <!-- 新增：尋找定位欄位 -->
-                                <th class="px-4 py-3 font-bold border-b border-slate-200 text-center w-24">操作</th>
-                            </tr>
+                    <table class="w-full text-sm text-left whitespace-nowrap">
+                        <thead id="logTableHead" class="sticky-header text-slate-600">
+                            <!-- JS 動態生成包含 18 欄位的表頭 -->
                         </thead>
                         <tbody id="logBody" class="divide-y divide-slate-100"></tbody>
                     </table>
@@ -437,9 +430,17 @@
 
             if (appState.isNew) {
                 newValues._uid = appState.editUid;
-                appState.data.unshift(newValues);
-                // 紀錄 uid 供尋找功能使用
-                appState.logs.push({ time: timestamp, action: '新增', target: newValues['保管單號碼'] || '手動建立', details: '手動新增一筆資料', uid: newValues._uid });
+                // 更新：將新增的資料推送到最後面 (底部)
+                appState.data.push(newValues);
+                // 更新：紀錄 uid 以及包含 18 欄位的完整快照
+                appState.logs.push({ 
+                    time: timestamp, 
+                    action: '新增', 
+                    target: newValues['保管單號碼'] || '手動建立', 
+                    details: '手動新增一筆資料', 
+                    uid: newValues._uid,
+                    rowData: { ...newValues }
+                });
             } else {
                 const idx = appState.data.findIndex(d => d._uid === appState.editUid);
                 const oldData = appState.data[idx];
@@ -452,8 +453,15 @@
                 
                 if (changeLogs.length > 0) {
                     appState.data[idx] = { ...newValues, _uid: appState.editUid };
-                    // 紀錄 uid 供尋找功能使用
-                    appState.logs.push({ time: timestamp, action: '修正', target: oldData['保管單號碼'] || '無單號', details: changeLogs.join('；'), uid: appState.editUid });
+                    // 更新：紀錄 uid 以及修改後的完整快照
+                    appState.logs.push({ 
+                        time: timestamp, 
+                        action: '修正', 
+                        target: oldData['保管單號碼'] || '無單號', 
+                        details: changeLogs.join('；'), 
+                        uid: appState.editUid,
+                        rowData: { ...newValues }
+                    });
                 }
             }
 
@@ -473,13 +481,14 @@
         function executeDelete() {
             const row = appState.data.find(d => d._uid === pendingDeleteUid);
             appState.data = appState.data.filter(d => d._uid !== pendingDeleteUid);
-            // 刪除項目不紀錄 uid，因為資料已不存在無法定位
+            // 刪除項目不紀錄 uid，因為資料已不存在無法定位，但仍保留資料快照以供檢視
             appState.logs.push({
                 time: new Date().toLocaleString('zh-TW', { hour12: false }),
                 action: '刪除',
                 target: row['保管單號碼'] || '系統項目',
                 details: `移除品名：${row['品名'] || '未命名'}`,
-                uid: null 
+                uid: null,
+                rowData: { ...row }
             });
             renderTable();
             closeConfirm();
@@ -494,29 +503,55 @@
         document.getElementById('confirmBtn').onclick = executeDelete;
 
         function renderLogs() {
+            const head = document.getElementById('logTableHead');
             const body = document.getElementById('logBody');
+
+            // 動態生成日誌表頭（包含操作資訊與 18 個標準欄位）
+            let headHtml = `<tr>
+                <th class="px-4 py-3 font-bold border-b border-slate-200 min-w-[120px] whitespace-nowrap">異動時間</th>
+                <th class="px-4 py-3 font-bold border-b border-slate-200 whitespace-nowrap">動作</th>
+                <th class="px-4 py-3 font-bold border-b border-slate-200 whitespace-nowrap">單號</th>
+                <th class="px-4 py-3 font-bold border-b border-slate-200 min-w-[200px]">詳細內容</th>
+                <th class="px-4 py-3 font-bold border-b border-slate-200 text-center w-24 whitespace-nowrap">操作(定位)</th>`;
+            
+            STANDARD_HEADERS.forEach(h => {
+                headHtml += `<th class="px-4 py-3 font-bold border-b border-slate-200 whitespace-nowrap text-slate-400 text-xs">${escapeHTML(h)}</th>`;
+            });
+            headHtml += `</tr>`;
+            head.innerHTML = headHtml;
+
             if (appState.logs.length === 0) {
-                body.innerHTML = `<tr><td colspan="5" class="p-12 text-center text-slate-300">無任何變更記錄</td></tr>`;
+                body.innerHTML = `<tr><td colspan="${5 + STANDARD_HEADERS.length}" class="p-12 text-center text-slate-300">無任何變更記錄</td></tr>`;
                 return;
             }
-            body.innerHTML = [...appState.logs].reverse().map(log => `
+            
+            body.innerHTML = [...appState.logs].reverse().map(log => {
+                let rowHtml = `
                 <tr class="text-xs hover:bg-slate-50 transition-colors">
-                    <td class="px-4 py-4 font-mono text-slate-400">${log.time}</td>
-                    <td class="px-4 py-4">
+                    <td class="px-4 py-4 font-mono text-slate-400 whitespace-nowrap">${log.time}</td>
+                    <td class="px-4 py-4 whitespace-nowrap">
                         <span class="px-2 py-1 rounded font-bold ${log.action === '刪除' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}">
                             ${log.action}
                         </span>
                     </td>
-                    <td class="px-4 py-4 font-bold text-slate-700">${escapeHTML(log.target)}</td>
-                    <td class="px-4 py-4 text-slate-500">${escapeHTML(log.details)}</td>
-                    <td class="px-4 py-4 text-center">
+                    <td class="px-4 py-4 font-bold text-slate-700 whitespace-nowrap">${escapeHTML(log.target)}</td>
+                    <td class="px-4 py-4 text-slate-500 max-w-[250px] truncate" title="${escapeHTML(log.details)}">${escapeHTML(log.details)}</td>
+                    <td class="px-4 py-4 text-center whitespace-nowrap">
                         ${log.uid ? `<button onclick="locateItem('${log.uid}')" class="px-3 py-1.5 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 rounded-md font-bold transition shadow-sm flex items-center gap-1 mx-auto"><svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>尋找</button>` : '<span class="text-slate-300">-</span>'}
-                    </td>
-                </tr>
-            `).join('');
+                    </td>`;
+                
+                // 動態附加 18 欄位的快照資料
+                STANDARD_HEADERS.forEach(h => {
+                    const val = log.rowData ? log.rowData[h] : "";
+                    rowHtml += `<td class="px-4 py-4 text-slate-400 whitespace-nowrap max-w-[150px] truncate" title="${escapeHTML(val)}">${escapeHTML(val)}</td>`;
+                });
+
+                rowHtml += `</tr>`;
+                return rowHtml;
+            }).join('');
         }
 
-        // 修改：匯出時包含兩個工作表
+        // 修改：匯出時包含兩個工作表，並且在日誌中合併完整欄位
         function exportToExcel() {
             // 工作表 1：資料清單
             const exportData = appState.data.map(row => {
@@ -525,13 +560,24 @@
             });
             const wsData = XLSX.utils.json_to_sheet(exportData);
             
-            // 工作表 2：異動日誌
-            const exportLogs = appState.logs.map(log => ({
-                "異動時間": log.time,
-                "動作": log.action,
-                "單號對象": log.target,
-                "詳細內容": log.details
-            }));
+            // 工作表 2：異動日誌 (包含 18 欄位展開)
+            const exportLogs = appState.logs.map(log => {
+                let logObj = {
+                    "異動時間": log.time,
+                    "動作": log.action,
+                    "單號對象": log.target,
+                    "詳細內容": log.details
+                };
+                
+                // 將 18 個標準欄位的快照資料合併進入日誌匯出中
+                if (log.rowData) {
+                    STANDARD_HEADERS.forEach(h => {
+                        logObj[h] = log.rowData[h] || "";
+                    });
+                }
+                
+                return logObj;
+            });
             const wsLogs = XLSX.utils.json_to_sheet(exportLogs);
 
             // 建立工作簿並添加多個工作表
