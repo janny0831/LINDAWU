@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>保管品管理系統 - 功能強化版</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <style>
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f8fafc; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .sticky-col { position: sticky; right: 0; background-color: white; z-index: 10; box-shadow: -4px 0 6px -2px rgba(0, 0, 0, 0.05); }
+        .sticky-header { position: sticky; top: 0; background-color: #f1f5f9; z-index: 20; }
+        .sticky-col-header { position: sticky; right: 0; top: 0; background-color: #f1f5f9; z-index: 30; }
+        tr:hover .sticky-col { background-color: #f0f7ff; }
+        
+        /* 尋找定位的高亮動畫 */
+        .highlight-row {
+            animation: highlight-pulse 2.5s ease-out;
+        }
+        @keyframes highlight-pulse {
+            0% { background-color: #fef08a; } /* 黃色高亮 */
+            80% { background-color: #fef08a; } 
+            100% { background-color: transparent; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen">
+
+    <div class="max-w-[98vw] mx-auto p-4">
+        
+        <!-- 頂部控制列 -->
+        <header class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6 flex flex-col lg:flex-row justify-between items-center gap-4">
+            <div>
+                <h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                    保管品管理系統 (功能強化版)
+                </h1>
+                <p class="text-sm text-slate-500 mt-1">支援搜尋功能、多工作表匯出，以及日誌快速尋找定位。</p>
+            </div>
+            
+            <div class="flex flex-wrap justify-center gap-3">
+                <input type="file" id="fileUpload" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleFileUpload(event)">
+                <label for="fileUpload" class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-6 rounded-lg transition flex items-center gap-2 shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                    匯入 Excel 檔案
+                </label>
+                <button onclick="openAddModal()" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium py-2.5 px-4 rounded-lg transition flex items-center gap-2 shadow-sm">
+                    新增項目
+                </button>
+                <button id="exportBtn" onclick="exportToExcel()" class="bg-slate-800 hover:bg-slate-900 text-white font-medium py-2.5 px-6 rounded-lg transition flex items-center gap-2 shadow-sm hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    匯出清單與日誌
+                </button>
+            </div>
+        </header>
+
+        <!-- 主內容區 -->
+        <div id="mainContent" class="hidden">
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-200 mb-4 gap-4">
+                <div class="flex">
+                    <button onclick="switchTab('page1')" id="tab-page1" class="py-3 px-6 text-sm font-bold border-b-2 border-blue-600 text-blue-600 transition-colors">資料清單</button>
+                    <button onclick="switchTab('page2')" id="tab-page2" class="py-3 px-6 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition-colors">異動日誌</button>
+                </div>
+                
+                <!-- 新增：搜尋過濾框 -->
+                <div id="searchContainer" class="w-full md:w-80 pb-2 md:pb-0">
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                        </span>
+                        <input type="text" id="searchInput" oninput="handleSearch(this.value)" placeholder="搜尋品名、單號、保管人..." class="w-full pl-10 pr-4 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition shadow-sm">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Page 1: 清單 -->
+            <div id="page1" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="overflow-x-auto max-h-[75vh]">
+                    <table class="w-full text-sm text-left whitespace-nowrap">
+                        <thead id="tableHead" class="sticky-header"></thead>
+                        <tbody id="tableBody" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+                <div id="tableFooter" class="p-4 bg-slate-50 border-t border-slate-200 text-slate-500 text-sm font-medium"></div>
+            </div>
+
+            <!-- Page 2: 日誌 -->
+            <div id="page2" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="overflow-x-auto max-h-[75vh]">
+                    <table class="w-full text-sm text-left">
+                        <thead class="sticky-header text-slate-600">
+                            <tr>
+                                <th class="px-4 py-3 font-bold border-b border-slate-200">異動時間</th>
+                                <th class="px-4 py-3 font-bold border-b border-slate-200">動作</th>
+                                <th class="px-4 py-3 font-bold border-b border-slate-200">單號</th>
+                                <th class="px-4 py-3 font-bold border-b border-slate-200">詳細內容</th>
+                                <!-- 新增：尋找定位欄位 -->
+                                <th class="px-4 py-3 font-bold border-b border-slate-200 text-center w-24">操作</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logBody" class="divide-y divide-slate-100"></tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 空狀態 -->
+        <div id="emptyState" class="flex flex-col items-center justify-center p-24 bg-white rounded-xl shadow-sm border border-slate-200 text-center">
+            <div class="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            </div>
+            <h3 class="text-xl font-bold text-slate-900 mb-2">尚未匯入資料</h3>
+            <p class="text-slate-500 max-w-sm mx-auto">請上傳包含 18 個標準項目的 Excel 檔案。系統會自動解析日期與欄位名稱（包含處理欄位名稱內的空格）。</p>
+        </div>
+    </div>
+
+    <!-- 編輯 Modal -->
+    <div id="editModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[95vh]">
+            <div class="p-6 border-b border-slate-100 flex justify-between items-center">
+                <h3 id="modalTitle" class="text-xl font-bold text-slate-800">資料編輯</h3>
+                <button onclick="closeModal()" class="p-2 hover:bg-slate-100 rounded-full transition text-slate-400"><svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+            </div>
+            <div class="p-8 overflow-y-auto flex-1">
+                <form id="editForm" onsubmit="handleFormSubmit(event)">
+                    <div id="editFormFields" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-6"></div>
+                </form>
+            </div>
+            <div class="p-6 border-t border-slate-100 bg-slate-50 flex justify-end gap-3 rounded-b-2xl">
+                <button onclick="closeModal()" class="px-6 py-2.5 border border-slate-300 rounded-xl text-slate-700 bg-white hover:bg-slate-50 transition font-bold">取消</button>
+                <button type="submit" form="editForm" class="px-10 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition font-bold shadow-md">儲存並更新</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 刪除確認 -->
+    <div id="confirmModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
+            <div class="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            </div>
+            <h3 class="text-2xl font-bold text-slate-900 mb-2">確認刪除項目？</h3>
+            <p id="confirmText" class="text-slate-500 mb-8">此操作將無法復原。</p>
+            <div class="flex gap-4">
+                <button onclick="closeConfirm()" class="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition font-bold">取消</button>
+                <button id="confirmBtn" class="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition font-bold shadow-lg">確認移除</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 系統標準定義
+        const STANDARD_HEADERS = [
+            "是否盤點", "日期", "保管單號碼", "保管品號碼", "品名", "廠牌", "規格", "型式", 
+            "取得成本", "保管人", "部門", "存放地點", "備註", 
+            "固資轉列管取得日期", "處理結果", "轉出部門", "轉入部門", "取得日期"
+        ];
+
+        const DATE_FIELDS = ["日期", "固資轉列管取得日期", "取得日期"];
+
+        const appState = {
+            data: [],
+            logs: [],
+            editUid: null,
+            isNew: false
+        };
+
+        // 新增：用於保存當前搜尋關鍵字
+        window.currentSearchTerm = '';
+
+        const escapeHTML = (str) => {
+            if (str === null || str === undefined) return '';
+            return String(str).replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
+        };
+
+        /**
+         * 加強版日期解析
+         */
+        function parseExcelDate(cell) {
+            if (!cell) return "";
+            
+            // 優先讀取格式化文字
+            if (cell.w) {
+                let formatted = cell.w.split(' ')[0].replace(/-/g, '/');
+                if (/\d{4}\/\d{1,2}\/\d{1,2}/.test(formatted)) return formatted;
+            }
+
+            const val = cell.v;
+            if (val === undefined || val === null || val === "") return "";
+            
+            // 處理數字型 Excel 日期 (Serial number)
+            if (typeof val === 'number') {
+                const date = new Date(Math.round((val - 25569) * 86400 * 1000));
+                if (!isNaN(date.getTime())) {
+                    const y = date.getUTCFullYear();
+                    const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+                    const d = String(date.getUTCDate()).padStart(2, '0');
+                    return `${y}/${m}/${d}`;
+                }
+            }
+            
+            // 處理一般日期物件或字串
+            const d = new Date(val);
+            if (!isNaN(d.getTime())) {
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${y}/${m}/${day}`;
+            }
+            
+            return String(val).trim();
+        }
+
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const data = new Uint8Array(e.target.result);
+                const workbook = XLSX.read(data, { type: 'array', cellDates: false, cellNF: true, cellText: true });
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                
+                const range = XLSX.utils.decode_range(worksheet['!ref']);
+                const rawHeaders = [];
+                const cleanHeaders = [];
+                
+                for (let C = range.s.c; C <= range.e.c; ++C) {
+                    const cell = worksheet[XLSX.utils.encode_cell({ r: range.s.r, c: C })];
+                    const originalName = cell ? String(cell.v) : "UNKNOWN_" + C;
+                    rawHeaders[C] = originalName;
+                    cleanHeaders[C] = originalName.replace(/\s+/g, '');
+                }
+
+                const rows = [];
+                for (let R = range.s.r + 1; R <= range.e.r; ++R) {
+                    const row = {};
+                    let hasData = false;
+                    
+                    STANDARD_HEADERS.forEach(h => row[h] = "");
+
+                    for (let C = range.s.c; C <= range.e.c; ++C) {
+                        const cell = worksheet[XLSX.utils.encode_cell({ r: R, c: C })];
+                        const cleanHeader = cleanHeaders[C];
+                        
+                        if (STANDARD_HEADERS.includes(cleanHeader)) {
+                            if (DATE_FIELDS.includes(cleanHeader)) {
+                                row[cleanHeader] = parseExcelDate(cell);
+                            } else {
+                                row[cleanHeader] = cell ? (cell.w || cell.v || "").toString().trim() : "";
+                            }
+                            if (row[cleanHeader]) hasData = true;
+                        }
+                    }
+                    if (hasData) {
+                        row._uid = 'uid_' + Date.now() + '_' + R;
+                        rows.push(row);
+                    }
+                }
+                
+                appState.data = rows;
+                // 重置搜尋
+                document.getElementById('searchInput').value = '';
+                window.currentSearchTerm = '';
+                
+                initSystemView();
+            };
+            reader.readAsArrayBuffer(file);
+            e.target.value = '';
+        }
+
+        function initSystemView() {
+            document.getElementById('emptyState').classList.add('hidden');
+            document.getElementById('mainContent').classList.remove('hidden');
+            document.getElementById('exportBtn').classList.remove('hidden');
+            renderTable();
+        }
+
+        // 新增：處理搜尋輸入
+        function handleSearch(val) {
+            window.currentSearchTerm = val.trim();
+            renderTable();
+        }
+
+        // 新增：定位並高亮指定項目
+        function locateItem(uid) {
+            // 切換回資料清單頁面
+            switchTab('page1');
+            
+            // 清除搜尋條件，確保目標資料不會被過濾隱藏
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput.value !== '') {
+                searchInput.value = '';
+                window.currentSearchTerm = '';
+                renderTable(); // 重新渲染表格
+            }
+            
+            // 等待 DOM 更新後進行滾動與高亮
+            setTimeout(() => {
+                const targetRow = document.getElementById(`row-${uid}`);
+                if (targetRow) {
+                    // 平滑滾動到目標列
+                    targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    // 添加高亮動畫類別
+                    targetRow.classList.remove('highlight-row');
+                    void targetRow.offsetWidth; // 觸發重繪 (Reflow) 以重置動畫
+                    targetRow.classList.add('highlight-row');
+                }
+            }, 50);
+        }
+
+        function renderTable() {
+            const thead = document.getElementById('tableHead');
+            const tbody = document.getElementById('tableBody');
+            
+            let headHtml = `<tr class="bg-slate-50 text-slate-600 text-xs tracking-wider uppercase">`;
+            STANDARD_HEADERS.forEach(h => headHtml += `<th class="px-4 py-4 font-bold border-b border-slate-200">${escapeHTML(h)}</th>`);
+            headHtml += `<th class="sticky-col-header px-4 py-4 font-bold text-center w-28 border-b border-slate-200">操作</th></tr>`;
+            thead.innerHTML = headHtml;
+
+            let bodyHtml = '';
+            
+            // 根據搜尋關鍵字過濾資料
+            let displayData = appState.data;
+            if (window.currentSearchTerm) {
+                const term = window.currentSearchTerm.toLowerCase();
+                displayData = appState.data.filter(row => {
+                    // 檢查是否任一欄位包含搜尋字串
+                    return STANDARD_HEADERS.some(h => String(row[h] || '').toLowerCase().includes(term));
+                });
+            }
+
+            displayData.forEach(row => {
+                // 加入 id 屬性以利「尋找」功能定位
+                bodyHtml += `<tr id="row-${row._uid}" class="hover:bg-blue-50/40 transition-colors">`;
+                STANDARD_HEADERS.forEach(h => {
+                    const val = row[h] || "";
+                    let display = escapeHTML(val);
+                    if (h === "是否盤點") {
+                        const style = val === 'Y' ? 'bg-green-100 text-green-700' : (val === 'N' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-400');
+                        display = `<span class="px-2 py-0.5 rounded text-[10px] font-black ${style}">${val || 'N'}</span>`;
+                    }
+                    bodyHtml += `<td class="px-4 py-3 border-b border-slate-100 max-w-[200px] truncate">${display}</td>`;
+                });
+                bodyHtml += `
+                    <td class="sticky-col px-4 py-3 border-b border-slate-100 text-center">
+                        <div class="flex justify-center gap-1">
+                            <button onclick="openEditModal('${row._uid}')" class="px-2 py-1 text-blue-600 hover:bg-blue-50 rounded-lg text-xs font-bold transition">編輯</button>
+                            <button onclick="confirmDelete('${row._uid}')" class="p-1 text-red-400 hover:bg-red-50 rounded-lg transition"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                        </div>
+                    </td></tr>`;
+            });
+            tbody.innerHTML = bodyHtml;
+            
+            // 更新狀態列文字
+            if (window.currentSearchTerm) {
+                document.getElementById('tableFooter').innerHTML = `搜尋結果： <strong>${displayData.length}</strong> 筆 (總共 ${appState.data.length} 筆)`;
+            } else {
+                document.getElementById('tableFooter').innerHTML = `共計 <strong>${appState.data.length}</strong> 筆保管品資料`;
+            }
+        }
+
+        function switchTab(tabId) {
+            const active = ['border-blue-600', 'text-blue-600'];
+            const inactive = ['border-transparent', 'text-slate-500'];
+            document.getElementById('tab-page1').className = `py-3 px-6 text-sm font-bold border-b-2 ${tabId === 'page1' ? active.join(' ') : inactive.join(' ')}`;
+            document.getElementById('tab-page2').className = `py-3 px-6 text-sm font-bold border-b-2 ${tabId === 'page2' ? active.join(' ') : inactive.join(' ')}`;
+            document.getElementById('page1').classList.toggle('hidden', tabId !== 'page1');
+            document.getElementById('page2').classList.toggle('hidden', tabId !== 'page2');
+            
+            // 只有在資料清單頁面才顯示搜尋框
+            document.getElementById('searchContainer').classList.toggle('hidden', tabId !== 'page1');
+            
+            if (tabId === 'page2') renderLogs();
+        }
+
+        function openAddModal() {
+            appState.isNew = true;
+            appState.editUid = 'new_' + Date.now();
+            document.getElementById('modalTitle').innerText = "新增保管品項目";
+            renderForm({});
+            document.getElementById('editModal').classList.remove('hidden');
+        }
+
+        function openEditModal(uid) {
+            appState.isNew = false;
+            appState.editUid = uid;
+            const row = appState.data.find(d => d._uid === uid);
+            document.getElementById('modalTitle').innerText = "編輯欄位內容";
+            renderForm(row);
+            document.getElementById('editModal').classList.remove('hidden');
+        }
+
+        function renderForm(data) {
+            const container = document.getElementById('editFormFields');
+            let html = '';
+            STANDARD_HEADERS.forEach((h, index) => {
+                const val = data[h] || "";
+                html += `<div class="space-y-1">
+                    <label class="text-xs font-bold text-slate-500 uppercase tracking-tighter">${index+1}. ${escapeHTML(h)}</label>`;
+                
+                if (h === "是否盤點") {
+                    html += `
+                    <select name="${h}" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition font-medium">
+                        <option value="N" ${val === "N" ? "selected" : ""}>N (未盤點)</option>
+                        <option value="Y" ${val === "Y" ? "selected" : ""}>Y (已盤點)</option>
+                    </select>`;
+                } else if (DATE_FIELDS.includes(h)) {
+                    const dateVal = val.toString().replace(/\//g, '-');
+                    html += `<input type="date" name="${h}" value="${dateVal}" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition">`;
+                } else {
+                    html += `<input type="text" name="${h}" value="${escapeHTML(val)}" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none transition font-medium">`;
+                }
+                html += `</div>`;
+            });
+            container.innerHTML = html;
+        }
+
+        function handleFormSubmit(e) {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const newValues = {};
+            let changeLogs = [];
+            const timestamp = new Date().toLocaleString('zh-TW', { hour12: false });
+
+            STANDARD_HEADERS.forEach(h => {
+                let val = formData.get(h);
+                if (val && DATE_FIELDS.includes(h)) {
+                    val = val.replace(/-/g, '/');
+                }
+                newValues[h] = val || "";
+            });
+
+            if (appState.isNew) {
+                newValues._uid = appState.editUid;
+                appState.data.unshift(newValues);
+                // 紀錄 uid 供尋找功能使用
+                appState.logs.push({ time: timestamp, action: '新增', target: newValues['保管單號碼'] || '手動建立', details: '手動新增一筆資料', uid: newValues._uid });
+            } else {
+                const idx = appState.data.findIndex(d => d._uid === appState.editUid);
+                const oldData = appState.data[idx];
+                
+                STANDARD_HEADERS.forEach(h => {
+                    if (oldData[h] !== newValues[h]) {
+                        changeLogs.push(`[${h}]：${oldData[h] || '空'} ➔ ${newValues[h] || '空'}`);
+                    }
+                });
+                
+                if (changeLogs.length > 0) {
+                    appState.data[idx] = { ...newValues, _uid: appState.editUid };
+                    // 紀錄 uid 供尋找功能使用
+                    appState.logs.push({ time: timestamp, action: '修正', target: oldData['保管單號碼'] || '無單號', details: changeLogs.join('；'), uid: appState.editUid });
+                }
+            }
+
+            renderTable();
+            closeModal();
+            if (appState.data.length > 0) initSystemView();
+        }
+
+        let pendingDeleteUid = null;
+        function confirmDelete(uid) {
+            pendingDeleteUid = uid;
+            const row = appState.data.find(d => d._uid === uid);
+            document.getElementById('confirmText').innerHTML = `確定刪除單號 <span class="text-slate-900 font-bold underline">${row['保管單號碼'] || '(無單號)'}</span> 嗎？`;
+            document.getElementById('confirmModal').classList.remove('hidden');
+        }
+
+        function executeDelete() {
+            const row = appState.data.find(d => d._uid === pendingDeleteUid);
+            appState.data = appState.data.filter(d => d._uid !== pendingDeleteUid);
+            // 刪除項目不紀錄 uid，因為資料已不存在無法定位
+            appState.logs.push({
+                time: new Date().toLocaleString('zh-TW', { hour12: false }),
+                action: '刪除',
+                target: row['保管單號碼'] || '系統項目',
+                details: `移除品名：${row['品名'] || '未命名'}`,
+                uid: null 
+            });
+            renderTable();
+            closeConfirm();
+            if (appState.data.length === 0) {
+                document.getElementById('mainContent').classList.add('hidden');
+                document.getElementById('emptyState').classList.remove('hidden');
+            }
+        }
+
+        function closeModal() { document.getElementById('editModal').classList.add('hidden'); }
+        function closeConfirm() { document.getElementById('confirmModal').classList.add('hidden'); }
+        document.getElementById('confirmBtn').onclick = executeDelete;
+
+        function renderLogs() {
+            const body = document.getElementById('logBody');
+            if (appState.logs.length === 0) {
+                body.innerHTML = `<tr><td colspan="5" class="p-12 text-center text-slate-300">無任何變更記錄</td></tr>`;
+                return;
+            }
+            body.innerHTML = [...appState.logs].reverse().map(log => `
+                <tr class="text-xs hover:bg-slate-50 transition-colors">
+                    <td class="px-4 py-4 font-mono text-slate-400">${log.time}</td>
+                    <td class="px-4 py-4">
+                        <span class="px-2 py-1 rounded font-bold ${log.action === '刪除' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}">
+                            ${log.action}
+                        </span>
+                    </td>
+                    <td class="px-4 py-4 font-bold text-slate-700">${escapeHTML(log.target)}</td>
+                    <td class="px-4 py-4 text-slate-500">${escapeHTML(log.details)}</td>
+                    <td class="px-4 py-4 text-center">
+                        ${log.uid ? `<button onclick="locateItem('${log.uid}')" class="px-3 py-1.5 bg-indigo-100 text-indigo-700 hover:bg-indigo-200 rounded-md font-bold transition shadow-sm flex items-center gap-1 mx-auto"><svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>尋找</button>` : '<span class="text-slate-300">-</span>'}
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // 修改：匯出時包含兩個工作表
+        function exportToExcel() {
+            // 工作表 1：資料清單
+            const exportData = appState.data.map(row => {
+                const { _uid, ...rest } = row;
+                return rest;
+            });
+            const wsData = XLSX.utils.json_to_sheet(exportData);
+            
+            // 工作表 2：異動日誌
+            const exportLogs = appState.logs.map(log => ({
+                "異動時間": log.time,
+                "動作": log.action,
+                "單號對象": log.target,
+                "詳細內容": log.details
+            }));
+            const wsLogs = XLSX.utils.json_to_sheet(exportLogs);
+
+            // 建立工作簿並添加多個工作表
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, wsData, "保管品清單");
+            
+            // 若有異動紀錄則一起匯出
+            if (exportLogs.length > 0) {
+                XLSX.utils.book_append_sheet(workbook, wsLogs, "異動日誌");
+            }
+            
+            XLSX.writeFile(workbook, `保管品管理系統_${new Date().toISOString().slice(0,10)}.xlsx`);
+        }
+    </script>
+</body>
+</html>
