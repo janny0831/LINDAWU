@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>保管品管理系統 - 完全還原版</title>
+    <title>保管品管理系統 - 日期格式自動修復版</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <style>
@@ -30,7 +30,6 @@
 
     <div class="max-w-[98vw] mx-auto p-4">
         
-        <!-- 頂部控制列 -->
         <header class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6 flex flex-col lg:flex-row justify-between items-center gap-4">
             <div>
                 <h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
@@ -39,26 +38,25 @@
                     </svg>
                     大量(管理部)保管品管理系統
                 </h1>
-                <p class="text-sm text-slate-500 mt-1">支援完整「匯入/匯出」閉環，包含資料清單、歷史日誌與定位功能。</p>
+                <p class="text-sm text-slate-500 mt-1">已實作智慧型日期偵測，自動將 Excel 序號轉換為 YYYY/MM/DD 格式。</p>
             </div>
             
             <div class="flex flex-wrap justify-center gap-3">
                 <input type="file" id="fileUpload" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleFileUpload(event)">
                 <label for="fileUpload" class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-6 rounded-lg transition flex items-center gap-2 shadow-sm">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                    匯入 Excel (含日誌)
+                    匯入 Excel (自動修復日期)
                 </label>
                 <button onclick="openAddModal()" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium py-2.5 px-4 rounded-lg transition flex items-center gap-2 shadow-sm">
                     新增項目
                 </button>
                 <button id="exportBtn" onclick="exportToExcel()" class="bg-slate-800 hover:bg-slate-900 text-white font-medium py-2.5 px-6 rounded-lg transition flex items-center gap-2 shadow-sm hidden">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                    匯出清單與日誌
+                    匯出備份
                 </button>
             </div>
         </header>
 
-        <!-- 主內容區 -->
         <div id="mainContent" class="hidden">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-200 mb-4 gap-4">
                 <div class="flex">
@@ -76,7 +74,6 @@
                 </div>
             </div>
 
-            <!-- Page 1: 清單 -->
             <div id="page1" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 <div class="overflow-x-auto max-h-[75vh]">
                     <table class="w-full text-sm text-left whitespace-nowrap">
@@ -87,7 +84,6 @@
                 <div id="tableFooter" class="p-4 bg-slate-50 border-t border-slate-200 text-slate-500 text-sm font-medium"></div>
             </div>
 
-            <!-- Page 2: 日誌 -->
             <div id="page2" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 <div class="overflow-x-auto max-h-[75vh]">
                     <table class="w-full text-sm text-left whitespace-nowrap">
@@ -98,17 +94,15 @@
             </div>
         </div>
 
-        <!-- 空狀態 -->
         <div id="emptyState" class="flex flex-col items-center justify-center p-24 bg-white rounded-xl shadow-sm border border-slate-200 text-center">
             <div class="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
             </div>
             <h3 class="text-xl font-bold text-slate-900 mb-2">尚未匯入資料</h3>
-            <p class="text-slate-500 max-w-sm mx-auto">請上傳由本系統導出的 Excel 檔案。系統將自動還原清單與完整的異動日誌紀錄。</p>
+            <p class="text-slate-500 max-w-sm mx-auto">請上傳 Excel 檔案。系統會自動修復常見的日期序號錯誤（如 45292 變回 2024/01/01）。</p>
         </div>
     </div>
 
-    <!-- 編輯 Modal -->
     <div id="editModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[95vh]">
             <div class="p-6 border-b border-slate-100 flex justify-between items-center">
@@ -127,7 +121,6 @@
         </div>
     </div>
 
-    <!-- 刪除確認 -->
     <div id="confirmModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
             <div class="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -164,15 +157,16 @@
             return String(str).replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
         };
 
-        function parseExcelDate(cell) {
-            if (!cell) return "";
-            if (cell.w) {
-                let formatted = cell.w.split(' ')[0].replace(/-/g, '/');
-                if (/\d{4}\/\d{1,2}\/\d{1,2}/.test(formatted)) return formatted;
-            }
-            const val = cell.v;
-            if (typeof val === 'number') {
-                const date = new Date(Math.round((val - 25569) * 86400 * 1000));
+        /**
+         * 核心優化：智慧型日期解析
+         * 支援：標準字串、HTML Date 字串、Excel 日期序號
+         */
+        function parseExcelDate(val) {
+            if (val === undefined || val === null || val === "") return "";
+            
+            // 1. 如果是 Excel 日期序號 (通常是 > 10000 的數字)
+            if (!isNaN(val) && typeof val !== 'boolean' && parseFloat(val) > 10000) {
+                const date = new Date(Math.round((parseFloat(val) - 25569) * 86400 * 1000));
                 if (!isNaN(date.getTime())) {
                     const y = date.getUTCFullYear();
                     const m = String(date.getUTCMonth() + 1).padStart(2, '0');
@@ -180,6 +174,14 @@
                     return `${y}/${m}/${d}`;
                 }
             }
+
+            // 2. 如果已經是帶有分隔符號的字串 (YYYY/MM/DD 或 YYYY-MM-DD)
+            const strVal = String(val).trim();
+            if (/\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(strVal)) {
+                return strVal.replace(/-/g, '/');
+            }
+
+            // 3. 其他可能的日期格式嘗試
             const d = new Date(val);
             if (!isNaN(d.getTime())) {
                 const y = d.getFullYear();
@@ -187,11 +189,12 @@
                 const day = String(d.getDate()).padStart(2, '0');
                 return `${y}/${m}/${day}`;
             }
-            return String(val).trim();
+
+            return strVal;
         }
 
         /**
-         * 核心更新：處理多工作表匯入，還原資料與日誌
+         * 修改匯入邏輯：在欄位賦值時套用 parseExcelDate
          */
         function handleFileUpload(e) {
             const file = e.target.files[0];
@@ -200,60 +203,65 @@
             reader.onload = function(e) {
                 const binary = new Uint8Array(e.target.result);
                 const workbook = XLSX.read(binary, { type: 'array' });
+                const sheetName = workbook.SheetNames.find(n => n.includes("保管品") || n.includes("清單")) || workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
                 
-                // --- 1. 處理保管品清單 ---
-                const sheet1Name = workbook.SheetNames.find(n => n.includes("保管品") || n.includes("清單")) || workbook.SheetNames[0];
-                const worksheet1 = workbook.Sheets[sheet1Name];
-                const listRaw = XLSX.utils.sheet_to_json(worksheet1, { defval: "" });
-                
-                const importedData = listRaw.map((item, idx) => {
+                const importedData = rawRows.map((rawRow, idx) => {
                     const row = {};
-                    STANDARD_HEADERS.forEach(h => row[h] = item[h] !== undefined ? String(item[h]).trim() : "");
-                    // 賦予一個獨特的內部 ID
+                    const rawKeys = Object.keys(rawRow);
+                    const keyMap = {};
+                    rawKeys.forEach(k => keyMap[String(k).replace(/\s+/g, '')] = k);
+
+                    STANDARD_HEADERS.forEach(stdH => {
+                        const cleanStdH = stdH.replace(/\s+/g, '');
+                        let val = "";
+                        if (rawRow[stdH] !== undefined) {
+                            val = rawRow[stdH];
+                        } else if (keyMap[cleanStdH]) {
+                            val = rawRow[keyMap[cleanStdH]];
+                        } else if (cleanStdH === "取得成本" && keyMap["取代成本"]) {
+                            val = rawRow[keyMap["取代成本"]];
+                        }
+
+                        // --- 智慧日期修復觸發 ---
+                        if (DATE_FIELDS.includes(stdH)) {
+                            val = parseExcelDate(val);
+                        }
+
+                        row[stdH] = String(val).trim();
+                    });
                     row._uid = 'uid_' + Date.now() + '_' + idx;
                     return row;
                 });
 
-                // --- 2. 處理異動日誌 ---
-                const sheet2Name = workbook.SheetNames.find(n => n.includes("日誌"));
+                // 處理日誌 (同樣套用日期修復於資料快照中)
+                const logSheetName = workbook.SheetNames.find(n => n.includes("日誌"));
                 let importedLogs = [];
-                if (sheet2Name) {
-                    const worksheet2 = workbook.Sheets[sheet2Name];
-                    const logsRaw = XLSX.utils.sheet_to_json(worksheet2, { defval: "" });
-                    
-                    importedLogs = logsRaw.map(l => {
-                        const logObj = {
-                            time: l["異動時間"] || "",
-                            action: l["動作"] || "",
-                            target: l["單號對象"] || "",
-                            details: l["詳細內容"] || "",
-                            uid: null, // 匯入後初始設為空，下一步進行匹配
-                            rowData: {}
-                        };
+                if (logSheetName) {
+                    const logRows = XLSX.utils.sheet_to_json(workbook.Sheets[logSheetName], { defval: "" });
+                    importedLogs = logRows.map(l => {
+                        const logObj = { time: l["異動時間"] || "", action: l["動作"] || "", target: l["單號對象"] || "", details: l["詳細內容"] || "", uid: null, rowData: {} };
                         STANDARD_HEADERS.forEach(h => {
-                            logObj.rowData[h] = l[h] || "";
+                            let cellVal = l[h] || "";
+                            if (DATE_FIELDS.includes(h)) cellVal = parseExcelDate(cellVal);
+                            logObj.rowData[h] = cellVal;
                         });
-                        
-                        // 智慧匹配：如果日誌中的保管單號能在現有清單中找到，則還原定位功能
                         const match = importedData.find(d => d["保管單號碼"] === logObj.target && logObj.target !== "");
-                        if (match) {
-                            logObj.uid = match._uid;
-                        }
+                        if (match) logObj.uid = match._uid;
                         return logObj;
                     });
                 }
 
-                // 更新全局狀態
                 appState.data = importedData;
-                appState.logs = importedLogs.reverse(); // 因為 renderLogs 會再 reverse 一次顯示最新
-
-                document.getElementById('searchInput').value = '';
-                window.currentSearchTerm = '';
+                appState.logs = importedLogs.reverse();
                 initSystemView();
             };
             reader.readAsArrayBuffer(file);
             e.target.value = '';
         }
+
+        // --- 保留其餘所有現有功能 (renderTable, renderLogs, renderForm, etc.) ---
 
         function initSystemView() {
             document.getElementById('emptyState').classList.add('hidden');
@@ -357,6 +365,7 @@
                 if (h === "是否盤點") {
                     html += `<select name="${h}" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"><option value="N" ${val === "N" ? "selected" : ""}>N</option><option value="Y" ${val === "Y" ? "selected" : ""}>Y</option></select>`;
                 } else if (DATE_FIELDS.includes(h)) {
+                    // 將 YYYY/MM/DD 轉回 YYYY-MM-DD 以適應 HTML input
                     html += `<input type="date" name="${h}" value="${val.replace(/\//g, '-')}" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl">`;
                 } else {
                     html += `<input type="text" name="${h}" value="${escapeHTML(val)}" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl">`;
