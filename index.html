@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>大量(管理部)保管品管理系統 - 同步優化版</title>
+    <title>保管品管理系統 - 日期格式自動修復版 (結合Firebase)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <style>
@@ -15,51 +15,43 @@
         .sticky-header { position: sticky; top: 0; background-color: #f1f5f9; z-index: 20; }
         .sticky-col-header { position: sticky; right: 0; top: 0; background-color: #f1f5f9; z-index: 30; }
         tr:hover .sticky-col { background-color: #f0f7ff; }
-        .highlight-row { animation: highlight-pulse 2.5s ease-out; }
-        @keyframes highlight-pulse { 0% { background-color: #fef08a; } 80% { background-color: #fef08a; } 100% { background-color: transparent; } }
         
-        /* 進度條平滑動畫 */
-        #globalProgressBar { transition: width 0.3s cubic-bezier(0.1, 0.5, 0.5, 1); }
-        .loading-overlay { cursor: wait !important; pointer-events: none; opacity: 0.7; }
+        .highlight-row {
+            animation: highlight-pulse 2.5s ease-out;
+        }
+        @keyframes highlight-pulse {
+            0% { background-color: #fef08a; }
+            80% { background-color: #fef08a; } 
+            100% { background-color: transparent; }
+        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-800 font-sans min-h-screen">
 
-    <div id="globalProgressContainer" class="hidden fixed top-0 left-0 w-full z-[100] transition-opacity duration-300">
-        <div class="h-1.5 w-full bg-slate-200 overflow-hidden">
-            <div id="globalProgressBar" class="h-full bg-blue-600 shadow-[0_0_10px_rgba(37,99,235,0.6)]" style="width: 0%"></div>
-        </div>
-        <div class="bg-white/95 backdrop-blur-md px-4 py-2.5 text-[12px] font-bold text-blue-700 flex justify-between items-center shadow-lg border-b border-blue-100">
-            <span class="flex items-center gap-2">
-                <svg class="animate-spin h-4 w-4 text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                <span id="globalProgressText">正在與 Firebase 進行即時同步...</span>
-            </span>
-            <span id="globalProgressPercent" class="font-mono bg-blue-50 px-2 py-0.5 rounded">0%</span>
-        </div>
-    </div>
-
-    <div id="appBody" class="max-w-[98vw] mx-auto p-4 transition-all duration-300">
+    <div class="max-w-[98vw] mx-auto p-4">
+        
         <header class="bg-white rounded-xl shadow-sm border border-slate-200 p-6 mb-6 flex flex-col lg:flex-row justify-between items-center gap-4">
             <div>
                 <h1 class="text-2xl font-bold text-slate-800 flex items-center gap-2">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
                     </svg>
-                    大量科技(管理部)保管品管理系統
+                    大量(管理部)保管品管理系統
                 </h1>
-                <p class="text-sm text-slate-500 mt-1">Firebase 雲端同步版本 | 已實作進度精確鎖定功能</p>
+                <p class="text-sm text-slate-500 mt-1">已實作智慧型日期偵測，自動將 Excel 序號轉換為 YYYY/MM/DD 格式。(雲端即時同步版)</p>
             </div>
             
             <div class="flex flex-wrap justify-center gap-3">
                 <input type="file" id="fileUpload" accept=".xlsx, .xls, .csv" class="hidden" onchange="handleFileUpload(event)">
                 <label for="fileUpload" class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white font-medium py-2.5 px-6 rounded-lg transition flex items-center gap-2 shadow-sm">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                    匯入 Excel
+                    匯入 Excel (自動修復日期)
                 </label>
                 <button onclick="openAddModal()" class="bg-white border border-slate-300 hover:bg-slate-50 text-slate-700 font-medium py-2.5 px-4 rounded-lg transition flex items-center gap-2 shadow-sm">
                     新增項目
                 </button>
                 <button id="exportBtn" onclick="exportToExcel()" class="bg-slate-800 hover:bg-slate-900 text-white font-medium py-2.5 px-6 rounded-lg transition flex items-center gap-2 shadow-sm hidden">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                     匯出備份
                 </button>
             </div>
@@ -68,11 +60,17 @@
         <div id="mainContent" class="hidden">
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-200 mb-4 gap-4">
                 <div class="flex">
-                    <button onclick="switchTab('page1')" id="tab-page1" class="py-3 px-6 text-sm font-bold border-b-2 border-blue-600 text-blue-600">資料清單</button>
-                    <button onclick="switchTab('page2')" id="tab-page2" class="py-3 px-6 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700">異動日誌</button>
+                    <button onclick="switchTab('page1')" id="tab-page1" class="py-3 px-6 text-sm font-bold border-b-2 border-blue-600 text-blue-600 transition-colors">資料清單</button>
+                    <button onclick="switchTab('page2')" id="tab-page2" class="py-3 px-6 text-sm font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-700 transition-colors">異動日誌</button>
                 </div>
+                
                 <div id="searchContainer" class="w-full md:w-80 pb-2 md:pb-0">
-                    <input type="text" id="searchInput" oninput="handleSearch(this.value)" placeholder="搜尋品名、單號、保管人..." class="w-full px-4 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none transition shadow-sm">
+                    <div class="relative">
+                        <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                        </span>
+                        <input type="text" id="searchInput" oninput="handleSearch(this.value)" placeholder="搜尋品名、單號、保管人..." class="w-full pl-10 pr-4 py-2 bg-white border border-slate-300 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition shadow-sm">
+                    </div>
                 </div>
             </div>
 
@@ -97,8 +95,11 @@
         </div>
 
         <div id="emptyState" class="flex flex-col items-center justify-center p-24 bg-white rounded-xl shadow-sm border border-slate-200 text-center">
-            <h3 class="text-xl font-bold text-slate-900 mb-2">雲端資料庫連線中...</h3>
-            <p class="text-slate-500">若長時間無反應，請確認網路連線是否正常。</p>
+            <div class="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+            </div>
+            <h3 class="text-xl font-bold text-slate-900 mb-2">資料庫載入中或尚未匯入資料</h3>
+            <p class="text-slate-500 max-w-sm mx-auto">若為首次使用，請上傳 Excel 檔案。系統會自動修復常見的日期序號錯誤（如 45292 變回 2024/01/01）。</p>
         </div>
     </div>
 
@@ -122,8 +123,11 @@
 
     <div id="confirmModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full text-center">
+            <div class="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            </div>
             <h3 class="text-2xl font-bold text-slate-900 mb-2">確認刪除項目？</h3>
-            <p id="confirmText" class="text-slate-500 mb-8"></p>
+            <p id="confirmText" class="text-slate-500 mb-8">此操作將無法復原。</p>
             <div class="flex gap-4">
                 <button onclick="closeConfirm()" class="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition font-bold">取消</button>
                 <button id="confirmBtn" class="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition font-bold shadow-lg">確認移除</button>
@@ -133,8 +137,10 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-analytics.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
 
+        // Your web app's Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyCrHB-_fcAeScIJe_gWeGn18JKnq8TUz9k",
             authDomain: "lindawu-67049.firebaseapp.com",
@@ -145,8 +151,12 @@
             measurementId: "G-REYKXP80NX"
         };
 
+        // Initialize Firebase
         const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
         const db = getFirestore(app);
+        
+        // 設定雲端資料庫的路徑文件
         const dbDocRef = doc(db, "storageApp", "mainData");
 
         const STANDARD_HEADERS = [
@@ -156,88 +166,26 @@
         ];
         const DATE_FIELDS = ["日期", "固資轉列管取得日期", "取得日期"];
 
-        const appState = { data: [], logs: [], editUid: null, isNew: false };
+        const appState = {
+            data: [],
+            logs: [],
+            editUid: null,
+            isNew: false
+        };
         window.currentSearchTerm = '';
 
-        // --- 強化的同步進度條控制邏輯 ---
-        let progressInterval;
-        let currentProgress = 0;
-
-        function startProgress(text) {
-            const container = document.getElementById('globalProgressContainer');
-            const bar = document.getElementById('globalProgressBar');
-            const txt = document.getElementById('globalProgressText');
-            const pct = document.getElementById('globalProgressPercent');
-            const body = document.getElementById('appBody');
-            
-            container.classList.remove('hidden', 'opacity-0');
-            body.classList.add('loading-overlay'); // 鎖定 UI 防止連點
-            txt.innerText = text;
-            currentProgress = 0;
-            
-            clearInterval(progressInterval);
-            // 第一階段：快速衝到 30%
-            currentProgress = 30;
-            bar.style.width = currentProgress + '%';
-            pct.innerText = currentProgress + '%';
-
-            // 第二階段：極慢爬行（模擬正在處理大檔案），每秒只增加 1%~2%，最高到 95%
-            progressInterval = setInterval(() => {
-                if (currentProgress < 95) {
-                    currentProgress += 1;
-                    bar.style.width = currentProgress + '%';
-                    pct.innerText = currentProgress + '%';
-                }
-            }, 800); 
-        }
-
-        function endProgress() {
-            const container = document.getElementById('globalProgressContainer');
-            const bar = document.getElementById('globalProgressBar');
-            const pct = document.getElementById('globalProgressPercent');
-            const body = document.getElementById('appBody');
-            
-            clearInterval(progressInterval);
-            
-            // 第三階段：接收到 Firebase 成功訊號，強制衝到 100%
-            currentProgress = 100;
-            bar.style.width = '100%';
-            pct.innerText = '100%';
-            
-            // 延遲消失，讓使用者看到完成狀態
-            setTimeout(() => {
-                container.classList.add('opacity-0');
-                body.classList.remove('loading-overlay');
-                setTimeout(() => {
-                    container.classList.add('hidden');
-                    bar.style.width = '0%';
-                }, 300);
-            }, 800);
-        }
-
-        // --- Firebase 核心同步區 ---
-
-        // 寫入資料：確保 endProgress 鎖在 .then() 裡面
+        // 【新增】儲存至 Firebase 功能
         function saveToFirebase() {
-            startProgress("正在上傳資料至雲端控制台，請稍候..."); 
             setDoc(dbDocRef, {
                 data: appState.data,
                 logs: appState.logs
-            }).then(() => {
-                // 只有 Firebase 伺服器回傳成功，才會呼叫 endProgress
-                endProgress();
             }).catch(error => {
-                console.error("Firebase 寫入失敗:", error);
-                alert("寫入失敗，請檢查網路！");
-                endProgress();
+                console.error("Firebase 儲存失敗:", error);
             });
         }
 
-        // 讀取資料
-        let isFirstTime = true;
+        // 【新增】網頁載入時，從 Firebase 取得並監聽即時更新
         onSnapshot(dbDocRef, (docSnap) => {
-            if (isFirstTime) startProgress("正在讀取雲端最新資料庫...");
-
             if (docSnap.exists()) {
                 const cloudData = docSnap.data();
                 appState.data = cloudData.data || [];
@@ -247,59 +195,111 @@
                     initSystemView();
                 } else {
                     document.getElementById('mainContent').classList.add('hidden');
+                    document.getElementById('exportBtn').classList.add('hidden');
                     document.getElementById('emptyState').classList.remove('hidden');
                 }
                 
+                // 若主畫面已顯示，則即時刷新畫面表格
                 if (!document.getElementById('mainContent').classList.contains('hidden')) {
                     renderTable();
                     renderLogs();
                 }
             }
-
-            if (isFirstTime) {
-                // 等待畫面渲染完成後結束進度條
-                setTimeout(endProgress, 500);
-                isFirstTime = false;
-            }
         });
 
-        // --- 其餘原有功能維持不變 ---
         const escapeHTML = (str) => {
-            if (!str) return '';
+            if (str === null || str === undefined) return '';
             return String(str).replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
         };
 
         function parseExcelDate(val) {
-            if (!val) return "";
-            if (!isNaN(val) && parseFloat(val) > 10000) {
+            if (val === undefined || val === null || val === "") return "";
+            if (!isNaN(val) && typeof val !== 'boolean' && parseFloat(val) > 10000) {
                 const date = new Date(Math.round((parseFloat(val) - 25569) * 86400 * 1000));
-                const y = date.getUTCFullYear(), m = String(date.getUTCMonth() + 1).padStart(2, '0'), d = String(date.getUTCDate()).padStart(2, '0');
-                return `${y}/${m}/${d}`;
+                if (!isNaN(date.getTime())) {
+                    const y = date.getUTCFullYear();
+                    const m = String(date.getUTCMonth() + 1).padStart(2, '0');
+                    const d = String(date.getUTCDate()).padStart(2, '0');
+                    return `${y}/${m}/${d}`;
+                }
             }
-            const s = String(val).trim();
-            if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(s)) return s.replace(/-/g, '/');
-            return s;
+
+            const strVal = String(val).trim();
+            if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(strVal)) {
+                return strVal.replace(/-/g, '/');
+            }
+
+            const d = new Date(val);
+            if (!isNaN(d.getTime())) {
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${y}/${m}/${day}`;
+            }
+
+            return strVal;
         }
 
         function handleFileUpload(e) {
             const file = e.target.files[0];
             if (!file) return;
-            startProgress("正在處理 Excel 大量數據...");
             const reader = new FileReader();
             reader.onload = function(evt) {
-                const workbook = XLSX.read(new Uint8Array(evt.target.result), { type: 'array' });
-                const sheet = workbook.Sheets[workbook.SheetNames[0]];
-                const rawRows = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+                const binary = new Uint8Array(evt.target.result);
+                const workbook = XLSX.read(binary, { type: 'array' });
+                const sheetName = workbook.SheetNames.find(n => n.includes("保管品") || n.includes("清單")) || workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const rawRows = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
                 
-                appState.data = rawRows.map((rawRow, idx) => {
-                    const row = { _uid: 'uid_' + Date.now() + '_' + idx };
-                    STANDARD_HEADERS.forEach(h => {
-                        let val = rawRow[h] || "";
-                        if (DATE_FIELDS.includes(h)) val = parseExcelDate(val);
-                        row[h] = String(val).trim();
+                const importedData = rawRows.map((rawRow, idx) => {
+                    const row = {};
+                    const rawKeys = Object.keys(rawRow);
+                    const keyMap = {};
+                    rawKeys.forEach(k => keyMap[String(k).replace(/\s+/g, '')] = k);
+
+                    STANDARD_HEADERS.forEach(stdH => {
+                        const cleanStdH = stdH.replace(/\s+/g, '');
+                        let val = "";
+                       
+                        if (rawRow[stdH] !== undefined) {
+                            val = rawRow[stdH];
+                        } else if (keyMap[cleanStdH]) {
+                            val = rawRow[keyMap[cleanStdH]];
+                        } else if (cleanStdH === "取得成本" && keyMap["取代成本"]) {
+                            val = rawRow[keyMap["取代成本"]];
+                        }
+
+                        if (DATE_FIELDS.includes(stdH)) {
+                            val = parseExcelDate(val);
+                        }
+
+                        row[stdH] = String(val).trim();
                     });
+                    row._uid = 'uid_' + Date.now() + '_' + idx;
                     return row;
                 });
+
+                const logSheetName = workbook.SheetNames.find(n => n.includes("日誌"));
+                let importedLogs = [];
+                if (logSheetName) {
+                    const logRows = XLSX.utils.sheet_to_json(workbook.Sheets[logSheetName], { defval: "" });
+                    importedLogs = logRows.map(l => {
+                        const logObj = { time: l["異動時間"] || "", action: l["動作"] || "", target: l["單號對象"] || "", details: l["詳細內容"] || "", uid: null, rowData: {} };
+                        STANDARD_HEADERS.forEach(h => {
+                            let cellVal = l[h] || "";
+                            if (DATE_FIELDS.includes(h)) cellVal = parseExcelDate(cellVal);
+                            logObj.rowData[h] = cellVal;
+                        });
+                        const match = importedData.find(d => d["保管單號碼"] === logObj.target && logObj.target !== "");
+                        if (match) logObj.uid = match._uid;
+                        return logObj;
+                    });
+                }
+
+                appState.data = importedData;
+                appState.logs = importedLogs.reverse();
+                
+                // 【整合】觸發資料庫儲存
                 saveToFirebase();
                 initSystemView();
             };
@@ -311,65 +311,204 @@
             document.getElementById('emptyState').classList.add('hidden');
             document.getElementById('mainContent').classList.remove('hidden');
             document.getElementById('exportBtn').classList.remove('hidden');
+            renderTable();
+            renderLogs();
         }
 
-        function handleSearch(val) { window.currentSearchTerm = val.trim(); renderTable(); }
+        function handleSearch(val) {
+            window.currentSearchTerm = val.trim();
+            renderTable();
+        }
+
+        function locateItem(uid) {
+            switchTab('page1');
+            const searchInput = document.getElementById('searchInput');
+            if (searchInput.value !== '') {
+                searchInput.value = '';
+                window.currentSearchTerm = '';
+                renderTable();
+            }
+            setTimeout(() => {
+                const targetRow = document.getElementById(`row-${uid}`);
+                if (targetRow) {
+                    targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    targetRow.classList.remove('highlight-row');
+                    void targetRow.offsetWidth;
+                    targetRow.classList.add('highlight-row');
+                }
+            }, 50);
+        }
 
         function renderTable() {
-            const thead = document.getElementById('tableHead'), tbody = document.getElementById('tableBody');
-            thead.innerHTML = `<tr class="bg-slate-50 text-slate-600 text-xs uppercase font-bold">` + 
-                STANDARD_HEADERS.map(h => `<th class="px-4 py-4 border-b">${h}</th>`).join('') + 
-                `<th class="sticky-col-header px-4 py-4 border-b text-center w-28">操作</th></tr>`;
+            const thead = document.getElementById('tableHead');
+            const tbody = document.getElementById('tableBody');
+            let headHtml = `<tr class="bg-slate-50 text-slate-600 text-xs tracking-wider uppercase">`;
+            STANDARD_HEADERS.forEach(h => headHtml += `<th class="px-4 py-4 font-bold border-b border-slate-200">${escapeHTML(h)}</th>`);
+            headHtml += `<th class="sticky-col-header px-4 py-4 font-bold text-center w-28 border-b border-slate-200">操作</th></tr>`;
+            thead.innerHTML = headHtml;
 
-            const displayData = window.currentSearchTerm ? appState.data.filter(row => STANDARD_HEADERS.some(h => String(row[h]||'').toLowerCase().includes(window.currentSearchTerm.toLowerCase()))) : appState.data;
-            
-            tbody.innerHTML = displayData.map(row => {
-                return `<tr id="row-${row._uid}" class="hover:bg-blue-50/40">` + 
-                    STANDARD_HEADERS.map(h => `<td class="px-4 py-3 border-b truncate max-w-[200px]">${h==='是否盤點' && row[h]==='Y' ? `<span class="bg-green-100 text-green-700 px-2 py-0.5 rounded text-[10px] font-black">Y</span>` : escapeHTML(row[h])}</td>`).join('') + 
-                    `<td class="sticky-col px-4 py-3 border-b text-center"><button onclick="openEditModal('${row._uid}')" class="text-blue-600 font-bold text-xs">編輯</button></td></tr>`;
-            }).join('');
-            document.getElementById('tableFooter').innerHTML = `目前顯示: ${displayData.length} 筆資料`;
+            let displayData = appState.data;
+            if (window.currentSearchTerm) {
+                const term = window.currentSearchTerm.toLowerCase();
+                displayData = appState.data.filter(row => STANDARD_HEADERS.some(h => String(row[h] || '').toLowerCase().includes(term)));
+            }
+
+            let bodyHtml = '';
+            displayData.forEach(row => {
+                bodyHtml += `<tr id="row-${row._uid}" class="hover:bg-blue-50/40 transition-colors">`;
+                STANDARD_HEADERS.forEach(h => {
+                    const val = row[h] || "";
+                    let display = escapeHTML(val);
+                    if (h === "是否盤點") {
+                        const style = val === 'Y' ? 'bg-green-100 text-green-700' : (val === 'N' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-400');
+                        display = `<span class="px-2 py-0.5 rounded text-[10px] font-black ${style}">${val || 'N'}</span>`;
+                    }
+                    bodyHtml += `<td class="px-4 py-3 border-b border-slate-100 max-w-[200px] truncate">${display}</td>`;
+                });
+                bodyHtml += `
+                    <td class="sticky-col px-4 py-3 border-b border-slate-100 text-center">
+                        <div class="flex justify-center gap-1">
+                            <button onclick="openEditModal('${row._uid}')" class="px-2 py-1 text-blue-600 hover:bg-blue-50 rounded-lg text-xs font-bold transition">編輯</button>
+                            <button onclick="confirmDelete('${row._uid}')" class="p-1 text-red-400 hover:bg-red-50 rounded-lg transition"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                        </div>
+                    </td></tr>`;
+            });
+            tbody.innerHTML = bodyHtml;
+            document.getElementById('tableFooter').innerHTML = window.currentSearchTerm ? `搜尋結果： <strong>${displayData.length}</strong> 筆` : `共計 <strong>${appState.data.length}</strong> 筆`;
         }
 
-        function switchTab(id) {
-            document.getElementById('page1').classList.toggle('hidden', id !== 'page1');
-            document.getElementById('page2').classList.toggle('hidden', id !== 'page2');
-            document.getElementById('tab-page1').className = id === 'page1' ? "py-3 px-6 text-sm font-bold border-b-2 border-blue-600 text-blue-600" : "py-3 px-6 text-sm font-bold border-b-2 border-transparent text-slate-500";
-            document.getElementById('tab-page2').className = id === 'page2' ? "py-3 px-6 text-sm font-bold border-b-2 border-blue-600 text-blue-600" : "py-3 px-6 text-sm font-bold border-b-2 border-transparent text-slate-500";
+        function switchTab(tabId) {
+            const active = ['border-blue-600', 'text-blue-600'], inactive = ['border-transparent', 'text-slate-500'];
+            document.getElementById('tab-page1').className = `py-3 px-6 text-sm font-bold border-b-2 ${tabId === 'page1' ? active.join(' ') : inactive.join(' ')}`;
+            document.getElementById('tab-page2').className = `py-3 px-6 text-sm font-bold border-b-2 ${tabId === 'page2' ? active.join(' ') : inactive.join(' ')}`;
+            document.getElementById('page1').classList.toggle('hidden', tabId !== 'page1');
+            document.getElementById('page2').classList.toggle('hidden', tabId !== 'page2');
+            document.getElementById('searchContainer').classList.toggle('hidden', tabId !== 'page1');
+            if (tabId === 'page2') renderLogs();
         }
 
-        function openAddModal() { appState.isNew = true; appState.editUid = 'new_'+Date.now(); renderForm({}); document.getElementById('editModal').classList.remove('hidden'); }
-        function openEditModal(uid) { appState.isNew = false; appState.editUid = uid; renderForm(appState.data.find(d=>d._uid===uid)); document.getElementById('editModal').classList.remove('hidden'); }
-        function closeModal() { document.getElementById('editModal').classList.add('hidden'); }
+        function openAddModal() {
+            appState.isNew = true;
+            appState.editUid = 'new_' + Date.now();
+            document.getElementById('modalTitle').innerText = "新增保管品項目";
+            renderForm({}); document.getElementById('editModal').classList.remove('hidden');
+        }
+
+        function openEditModal(uid) {
+            appState.isNew = false;
+            appState.editUid = uid;
+            const row = appState.data.find(d => d._uid === uid);
+            document.getElementById('modalTitle').innerText = "編輯欄位內容";
+            renderForm(row); document.getElementById('editModal').classList.remove('hidden');
+        }
 
         function renderForm(data) {
-            document.getElementById('editFormFields').innerHTML = STANDARD_HEADERS.map((h, i) => `
-                <div class="space-y-1">
-                    <label class="text-xs font-bold text-slate-500">${i+1}. ${h}</label>
-                    <input type="${DATE_FIELDS.includes(h)?'date':'text'}" name="${h}" value="${(data[h]||'').replace(/\//g,'-')}" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl">
-                </div>
-            `).join('');
+            const container = document.getElementById('editFormFields');
+            let html = '';
+            STANDARD_HEADERS.forEach((h, index) => {
+                const val = data[h] || "";
+                html += `<div class="space-y-1"><label class="text-xs font-bold text-slate-500 uppercase">${index+1}. ${h}</label>`;
+                if (h === "是否盤點") {
+                    html += `<select name="${h}" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"><option value="N" ${val === "N" ? "selected" : ""}>N</option><option value="Y" ${val === "Y" ? "selected" : ""}>Y</option></select>`;
+                } else if (DATE_FIELDS.includes(h)) {
+                    html += `<input type="date" name="${h}" value="${val.replace(/\//g, '-')}" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl">`;
+                } else {
+                    html += `<input type="text" name="${h}" value="${escapeHTML(val)}" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl">`;
+                }
+                html += `</div>`;
+            });
+            container.innerHTML = html;
         }
 
         function handleFormSubmit(e) {
             e.preventDefault();
-            const formData = new FormData(e.target), newValues = { _uid: appState.editUid };
-            STANDARD_HEADERS.forEach(h => { let v = formData.get(h); if(v && DATE_FIELDS.includes(h)) v = v.replace(/-/g,'/'); newValues[h] = v || ""; });
+            const formData = new FormData(e.target), newValues = {}, timestamp = new Date().toLocaleString('zh-TW', { hour12: false });
+            STANDARD_HEADERS.forEach(h => {
+                let val = formData.get(h);
+                if (val && DATE_FIELDS.includes(h)) val = val.replace(/-/g, '/');
+                newValues[h] = val || "";
+            });
+            if (appState.isNew) {
+                newValues._uid = appState.editUid;
+                appState.data.push(newValues);
+                appState.logs.push({ time: timestamp, action: '新增', target: newValues['保管單號碼'] || '手動建立', details: '手動新增資料', uid: newValues._uid, rowData: {...newValues} });
+            } else {
+                const idx = appState.data.findIndex(d => d._uid === appState.editUid), oldData = appState.data[idx], changes = [];
+                STANDARD_HEADERS.forEach(h => { if (oldData[h] !== newValues[h]) changes.push(`[${h}]：${oldData[h]||'空'}➔${newValues[h]||'空'}`); });
+                if (changes.length > 0) {
+                    appState.data[idx] = { ...newValues, _uid: appState.editUid };
+                    appState.logs.push({ time: timestamp, action: '修正', target: oldData['保管單號碼'] || '無單號', details: changes.join('；'), uid: appState.editUid, rowData: {...newValues} });
+                }
+            }
+            renderTable();
             
-            if (appState.isNew) appState.data.push(newValues);
-            else { const idx = appState.data.findIndex(d => d._uid === appState.editUid); appState.data[idx] = newValues; }
-            
+            // 【整合】觸發資料庫儲存
             saveToFirebase();
-            closeModal();
+
+            closeModal(); if (appState.data.length > 0) initSystemView();
+        }
+
+        let pendingDeleteUid = null;
+        function confirmDelete(uid) {
+            pendingDeleteUid = uid;
+            const row = appState.data.find(d => d._uid === uid);
+            document.getElementById('confirmText').innerHTML = `確定刪除單號 <span class="font-bold underline">${row['保管單號碼']}</span>？`;
+            document.getElementById('confirmModal').classList.remove('hidden');
+        }
+
+        function executeDelete() {
+            const row = appState.data.find(d => d._uid === pendingDeleteUid);
+            appState.data = appState.data.filter(d => d._uid !== pendingDeleteUid);
+            appState.logs.push({ time: new Date().toLocaleString('zh-TW', { hour12: false }), action: '刪除', target: row['保管單號碼'] || '系統', details: `移除：${row['品名']}`, uid: null, rowData: {...row} });
+            
+            renderTable(); 
+            closeConfirm();
+
+            // 【整合】觸發資料庫儲存
+            saveToFirebase();
+
+            if (appState.data.length === 0) {
+                document.getElementById('mainContent').classList.add('hidden');
+                document.getElementById('exportBtn').classList.add('hidden');
+                document.getElementById('emptyState').classList.remove('hidden');
+            }
+        }
+
+        function closeModal() { document.getElementById('editModal').classList.add('hidden'); }
+        function closeConfirm() { document.getElementById('confirmModal').classList.add('hidden'); }
+        
+        document.getElementById('confirmBtn').onclick = executeDelete;
+        
+        function renderLogs() {
+            const head = document.getElementById('logTableHead'), body = document.getElementById('logBody');
+            let hHtml = `<tr><th class="px-4 py-3 font-bold border-b border-slate-200">異動時間</th><th class="px-4 py-3 font-bold border-b border-slate-200">動作</th><th class="px-4 py-3 font-bold border-b border-slate-200">單號</th><th class="px-4 py-3 font-bold border-b border-slate-200">詳細</th><th class="px-4 py-3 font-bold border-b border-slate-200 text-center">定位</th>`;
+            STANDARD_HEADERS.forEach(h => hHtml += `<th class="px-4 py-3 font-bold border-b border-slate-200 text-xs text-slate-400">${escapeHTML(h)}</th>`);
+            head.innerHTML = hHtml + `</tr>`;
+            if (appState.logs.length === 0) {
+                body.innerHTML = `<tr><td colspan="${5 + STANDARD_HEADERS.length}" class="p-12 text-center text-slate-300">無任何變更記錄</td></tr>`;
+                return;
+            }
+            body.innerHTML = [...appState.logs].reverse().map(log => {
+                let rHtml = `<tr class="text-xs hover:bg-slate-50"><td class="px-4 py-4 font-mono text-slate-400">${log.time}</td><td class="px-4 py-4"><span class="px-2 py-1 rounded font-bold ${log.action === '刪除' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}">${log.action}</span></td><td class="px-4 py-4 font-bold">${escapeHTML(log.target)}</td><td class="px-4 py-4 text-slate-500 truncate max-w-[200px]" title="${escapeHTML(log.details)}">${escapeHTML(log.details)}</td><td class="px-4 py-4 text-center">${log.uid ? `<button onclick="locateItem('${log.uid}')" class="px-2 py-1 bg-indigo-50 text-indigo-600 rounded font-bold">尋找</button>` : '-'}</td>`;
+                STANDARD_HEADERS.forEach(h => rHtml += `<td class="px-4 py-4 text-slate-400 truncate max-w-[120px]">${escapeHTML(log.rowData?.[h] || "")}</td>`);
+                return rHtml + `</tr>`;
+            }).join('');
         }
 
         function exportToExcel() {
+            const listWs = XLSX.utils.json_to_sheet(appState.data.map(({ _uid, ...r }) => r));
+            const logWs = XLSX.utils.json_to_sheet(appState.logs.map(l => {
+                let o = { "異動時間": l.time, "動作": l.action, "單號對象": l.target, "詳細內容": l.details };
+                if (l.rowData) STANDARD_HEADERS.forEach(h => o[h] = l.rowData[h] || "");
+                return o;
+            }));
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(appState.data.map(({_uid, ...r})=>r)), "保管品清單");
-            XLSX.writeFile(wb, `大量科技保管品_${new Date().toISOString().slice(0,10)}.xlsx`);
+            XLSX.utils.book_append_sheet(wb, listWs, "保管品清單");
+            XLSX.utils.book_append_sheet(wb, logWs, "異動日誌");
+            XLSX.writeFile(wb, `保管品系統備份_${new Date().toISOString().slice(0,10)}.xlsx`);
         }
 
-        // 全域掛載
+        // --- 將函式掛載至 window 全域物件，供 HTML 內部 onclick 及 onchange 使用 ---
         window.handleFileUpload = handleFileUpload;
         window.handleSearch = handleSearch;
         window.switchTab = switchTab;
@@ -377,7 +516,11 @@
         window.openEditModal = openEditModal;
         window.closeModal = closeModal;
         window.handleFormSubmit = handleFormSubmit;
+        window.confirmDelete = confirmDelete;
+        window.closeConfirm = closeConfirm;
+        window.locateItem = locateItem;
         window.exportToExcel = exportToExcel;
+
     </script>
 </body>
 </html>
