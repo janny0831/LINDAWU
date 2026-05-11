@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>保管品管理系統 - 日期格式自動修復版</title>
+    <title>保管品管理系統 - 日期格式自動修復版 (結合Firebase)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <style>
@@ -38,7 +38,7 @@
                     </svg>
                     大量(管理部)保管品管理系統
                 </h1>
-                <p class="text-sm text-slate-500 mt-1">已實作智慧型日期偵測，自動將 Excel 序號轉換為 YYYY/MM/DD 格式。</p>
+                <p class="text-sm text-slate-500 mt-1">已實作智慧型日期偵測，自動將 Excel 序號轉換為 YYYY/MM/DD 格式。(雲端即時同步版)</p>
             </div>
             
             <div class="flex flex-wrap justify-center gap-3">
@@ -98,8 +98,8 @@
             <div class="w-24 h-24 bg-slate-50 rounded-full flex items-center justify-center mb-6">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
             </div>
-            <h3 class="text-xl font-bold text-slate-900 mb-2">尚未匯入資料</h3>
-            <p class="text-slate-500 max-w-sm mx-auto">請上傳 Excel 檔案。系統會自動修復常見的日期序號錯誤（如 45292 變回 2024/01/01）。</p>
+            <h3 class="text-xl font-bold text-slate-900 mb-2">資料庫載入中或尚未匯入資料</h3>
+            <p class="text-slate-500 max-w-sm mx-auto">若為首次使用，請上傳 Excel 檔案。系統會自動修復常見的日期序號錯誤（如 45292 變回 2024/01/01）。</p>
         </div>
     </div>
 
@@ -135,7 +135,30 @@
         </div>
     </div>
 
-    <script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-analytics.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js";
+
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCrHB-_fcAeScIJe_gWeGn18JKnq8TUz9k",
+            authDomain: "lindawu-67049.firebaseapp.com",
+            projectId: "lindawu-67049",
+            storageBucket: "lindawu-67049.firebasestorage.app",
+            messagingSenderId: "910844253914",
+            appId: "1:910844253914:web:969f2c11a173b8e4f0b7e3",
+            measurementId: "G-REYKXP80NX"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        const db = getFirestore(app);
+        
+        // 設定雲端資料庫的路徑文件
+        const dbDocRef = doc(db, "storageApp", "mainData");
+
         const STANDARD_HEADERS = [
             "是否盤點", "日期", "保管單號碼", "保管品號碼", "品名", "廠牌", "規格", "型式", 
             "取得成本", "保管人", "部門", "存放地點", "備註", 
@@ -149,22 +172,48 @@
             editUid: null,
             isNew: false
         };
-
         window.currentSearchTerm = '';
+
+        // 【新增】儲存至 Firebase 功能
+        function saveToFirebase() {
+            setDoc(dbDocRef, {
+                data: appState.data,
+                logs: appState.logs
+            }).catch(error => {
+                console.error("Firebase 儲存失敗:", error);
+            });
+        }
+
+        // 【新增】網頁載入時，從 Firebase 取得並監聽即時更新
+        onSnapshot(dbDocRef, (docSnap) => {
+            if (docSnap.exists()) {
+                const cloudData = docSnap.data();
+                appState.data = cloudData.data || [];
+                appState.logs = cloudData.logs || [];
+                
+                if (appState.data.length > 0) {
+                    initSystemView();
+                } else {
+                    document.getElementById('mainContent').classList.add('hidden');
+                    document.getElementById('exportBtn').classList.add('hidden');
+                    document.getElementById('emptyState').classList.remove('hidden');
+                }
+                
+                // 若主畫面已顯示，則即時刷新畫面表格
+                if (!document.getElementById('mainContent').classList.contains('hidden')) {
+                    renderTable();
+                    renderLogs();
+                }
+            }
+        });
 
         const escapeHTML = (str) => {
             if (str === null || str === undefined) return '';
             return String(str).replace(/[&<>'"]/g, tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag));
         };
 
-        /**
-         * 核心優化：智慧型日期解析
-         * 支援：標準字串、HTML Date 字串、Excel 日期序號
-         */
         function parseExcelDate(val) {
             if (val === undefined || val === null || val === "") return "";
-            
-            // 1. 如果是 Excel 日期序號 (通常是 > 10000 的數字)
             if (!isNaN(val) && typeof val !== 'boolean' && parseFloat(val) > 10000) {
                 const date = new Date(Math.round((parseFloat(val) - 25569) * 86400 * 1000));
                 if (!isNaN(date.getTime())) {
@@ -175,13 +224,11 @@
                 }
             }
 
-            // 2. 如果已經是帶有分隔符號的字串 (YYYY/MM/DD 或 YYYY-MM-DD)
             const strVal = String(val).trim();
-            if (/\d{4}[-/]\d{1,2}[-/]\d{1,2}/.test(strVal)) {
+            if (/^\d{4}[-/]\d{1,2}[-/]\d{1,2}$/.test(strVal)) {
                 return strVal.replace(/-/g, '/');
             }
 
-            // 3. 其他可能的日期格式嘗試
             const d = new Date(val);
             if (!isNaN(d.getTime())) {
                 const y = d.getFullYear();
@@ -193,15 +240,12 @@
             return strVal;
         }
 
-        /**
-         * 修改匯入邏輯：在欄位賦值時套用 parseExcelDate
-         */
         function handleFileUpload(e) {
             const file = e.target.files[0];
             if (!file) return;
             const reader = new FileReader();
-            reader.onload = function(e) {
-                const binary = new Uint8Array(e.target.result);
+            reader.onload = function(evt) {
+                const binary = new Uint8Array(evt.target.result);
                 const workbook = XLSX.read(binary, { type: 'array' });
                 const sheetName = workbook.SheetNames.find(n => n.includes("保管品") || n.includes("清單")) || workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[sheetName];
@@ -216,6 +260,7 @@
                     STANDARD_HEADERS.forEach(stdH => {
                         const cleanStdH = stdH.replace(/\s+/g, '');
                         let val = "";
+                       
                         if (rawRow[stdH] !== undefined) {
                             val = rawRow[stdH];
                         } else if (keyMap[cleanStdH]) {
@@ -224,7 +269,6 @@
                             val = rawRow[keyMap["取代成本"]];
                         }
 
-                        // --- 智慧日期修復觸發 ---
                         if (DATE_FIELDS.includes(stdH)) {
                             val = parseExcelDate(val);
                         }
@@ -235,7 +279,6 @@
                     return row;
                 });
 
-                // 處理日誌 (同樣套用日期修復於資料快照中)
                 const logSheetName = workbook.SheetNames.find(n => n.includes("日誌"));
                 let importedLogs = [];
                 if (logSheetName) {
@@ -255,13 +298,14 @@
 
                 appState.data = importedData;
                 appState.logs = importedLogs.reverse();
+                
+                // 【整合】觸發資料庫儲存
+                saveToFirebase();
                 initSystemView();
             };
             reader.readAsArrayBuffer(file);
             e.target.value = '';
         }
-
-        // --- 保留其餘所有現有功能 (renderTable, renderLogs, renderForm, etc.) ---
 
         function initSystemView() {
             document.getElementById('emptyState').classList.add('hidden');
@@ -344,13 +388,15 @@
         }
 
         function openAddModal() {
-            appState.isNew = true; appState.editUid = 'new_' + Date.now();
+            appState.isNew = true;
+            appState.editUid = 'new_' + Date.now();
             document.getElementById('modalTitle').innerText = "新增保管品項目";
             renderForm({}); document.getElementById('editModal').classList.remove('hidden');
         }
 
         function openEditModal(uid) {
-            appState.isNew = false; appState.editUid = uid;
+            appState.isNew = false;
+            appState.editUid = uid;
             const row = appState.data.find(d => d._uid === uid);
             document.getElementById('modalTitle').innerText = "編輯欄位內容";
             renderForm(row); document.getElementById('editModal').classList.remove('hidden');
@@ -365,7 +411,6 @@
                 if (h === "是否盤點") {
                     html += `<select name="${h}" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"><option value="N" ${val === "N" ? "selected" : ""}>N</option><option value="Y" ${val === "Y" ? "selected" : ""}>Y</option></select>`;
                 } else if (DATE_FIELDS.includes(h)) {
-                    // 將 YYYY/MM/DD 轉回 YYYY-MM-DD 以適應 HTML input
                     html += `<input type="date" name="${h}" value="${val.replace(/\//g, '-')}" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl">`;
                 } else {
                     html += `<input type="text" name="${h}" value="${escapeHTML(val)}" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl">`;
@@ -383,7 +428,6 @@
                 if (val && DATE_FIELDS.includes(h)) val = val.replace(/-/g, '/');
                 newValues[h] = val || "";
             });
-
             if (appState.isNew) {
                 newValues._uid = appState.editUid;
                 appState.data.push(newValues);
@@ -396,12 +440,18 @@
                     appState.logs.push({ time: timestamp, action: '修正', target: oldData['保管單號碼'] || '無單號', details: changes.join('；'), uid: appState.editUid, rowData: {...newValues} });
                 }
             }
-            renderTable(); closeModal(); if (appState.data.length > 0) initSystemView();
+            renderTable();
+            
+            // 【整合】觸發資料庫儲存
+            saveToFirebase();
+
+            closeModal(); if (appState.data.length > 0) initSystemView();
         }
 
         let pendingDeleteUid = null;
         function confirmDelete(uid) {
-            pendingDeleteUid = uid; const row = appState.data.find(d => d._uid === uid);
+            pendingDeleteUid = uid;
+            const row = appState.data.find(d => d._uid === uid);
             document.getElementById('confirmText').innerHTML = `確定刪除單號 <span class="font-bold underline">${row['保管單號碼']}</span>？`;
             document.getElementById('confirmModal').classList.remove('hidden');
         }
@@ -410,23 +460,30 @@
             const row = appState.data.find(d => d._uid === pendingDeleteUid);
             appState.data = appState.data.filter(d => d._uid !== pendingDeleteUid);
             appState.logs.push({ time: new Date().toLocaleString('zh-TW', { hour12: false }), action: '刪除', target: row['保管單號碼'] || '系統', details: `移除：${row['品名']}`, uid: null, rowData: {...row} });
-            renderTable(); closeConfirm();
+            
+            renderTable(); 
+            closeConfirm();
+
+            // 【整合】觸發資料庫儲存
+            saveToFirebase();
+
             if (appState.data.length === 0) {
                 document.getElementById('mainContent').classList.add('hidden');
+                document.getElementById('exportBtn').classList.add('hidden');
                 document.getElementById('emptyState').classList.remove('hidden');
             }
         }
 
         function closeModal() { document.getElementById('editModal').classList.add('hidden'); }
         function closeConfirm() { document.getElementById('confirmModal').classList.add('hidden'); }
+        
         document.getElementById('confirmBtn').onclick = executeDelete;
-
+        
         function renderLogs() {
             const head = document.getElementById('logTableHead'), body = document.getElementById('logBody');
             let hHtml = `<tr><th class="px-4 py-3 font-bold border-b border-slate-200">異動時間</th><th class="px-4 py-3 font-bold border-b border-slate-200">動作</th><th class="px-4 py-3 font-bold border-b border-slate-200">單號</th><th class="px-4 py-3 font-bold border-b border-slate-200">詳細</th><th class="px-4 py-3 font-bold border-b border-slate-200 text-center">定位</th>`;
             STANDARD_HEADERS.forEach(h => hHtml += `<th class="px-4 py-3 font-bold border-b border-slate-200 text-xs text-slate-400">${escapeHTML(h)}</th>`);
             head.innerHTML = hHtml + `</tr>`;
-
             if (appState.logs.length === 0) {
                 body.innerHTML = `<tr><td colspan="${5 + STANDARD_HEADERS.length}" class="p-12 text-center text-slate-300">無任何變更記錄</td></tr>`;
                 return;
@@ -450,6 +507,20 @@
             XLSX.utils.book_append_sheet(wb, logWs, "異動日誌");
             XLSX.writeFile(wb, `保管品系統備份_${new Date().toISOString().slice(0,10)}.xlsx`);
         }
+
+        // --- 將函式掛載至 window 全域物件，供 HTML 內部 onclick 及 onchange 使用 ---
+        window.handleFileUpload = handleFileUpload;
+        window.handleSearch = handleSearch;
+        window.switchTab = switchTab;
+        window.openAddModal = openAddModal;
+        window.openEditModal = openEditModal;
+        window.closeModal = closeModal;
+        window.handleFormSubmit = handleFormSubmit;
+        window.confirmDelete = confirmDelete;
+        window.closeConfirm = closeConfirm;
+        window.locateItem = locateItem;
+        window.exportToExcel = exportToExcel;
+
     </script>
 </body>
 </html>
