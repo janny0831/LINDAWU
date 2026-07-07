@@ -95,7 +95,7 @@
 
             <div id="page1" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 <div class="overflow-x-auto max-h-[75vh]">
-                    <table class="w-full text-sm text-left whitespace-nowrap">
+                    <table class="w-full text-xs text-left whitespace-nowrap">
                         <thead id="tableHead" class="sticky-header"></thead>
                         <tbody id="tableBody" class="divide-y divide-slate-100"></tbody>
                     </table>
@@ -104,7 +104,7 @@
 
             <div id="page2" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
                 <div class="overflow-x-auto max-h-[75vh]">
-                    <table class="w-full text-sm text-left whitespace-nowrap">
+                    <table class="w-full text-xs text-left whitespace-nowrap">
                         <thead id="logTableHead" class="sticky-header text-slate-600"></thead>
                         <tbody id="logBody" class="divide-y divide-slate-100"></tbody>
                     </table>
@@ -364,9 +364,9 @@
         function renderTable() {
             const thead = document.getElementById('tableHead');
             const tbody = document.getElementById('tableBody');
-            let headHtml = `<tr class="bg-slate-50 text-slate-600 text-xs tracking-wider uppercase">`;
-            STANDARD_HEADERS.forEach(h => headHtml += `<th class="px-4 py-4 font-bold border-b border-slate-200">${escapeHTML(h)}</th>`);
-            headHtml += `<th class="sticky-col-header px-4 py-4 font-bold text-center w-28 border-b border-slate-200">操作</th></tr>`;
+            let headHtml = `<tr class="bg-slate-50 text-slate-600 tracking-wider uppercase">`;
+            STANDARD_HEADERS.forEach(h => headHtml += `<th class="px-2 py-2 font-bold border-b border-slate-200">${escapeHTML(h)}</th>`);
+            headHtml += `<th class="sticky-col-header px-2 py-2 font-bold text-center w-16 border-b border-slate-200">操作</th></tr>`;
             thead.innerHTML = headHtml;
 
             let displayData = appState.data;
@@ -383,12 +383,12 @@
                     let display = escapeHTML(val);
                     if (h === "是否盤點") {
                         const style = val === 'Y' ? 'bg-green-100 text-green-700' : (val === 'N' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-400');
-                        display = `<span class="px-2 py-0.5 rounded text-[10px] font-black ${style}">${val || 'N'}</span>`;
+                        display = `<span class="px-1.5 py-0.5 rounded text-[10px] font-black ${style}">${val || 'N'}</span>`;
                     }
-                    bodyHtml += `<td class="px-4 py-3 border-b border-slate-100 max-w-[200px] truncate">${display}</td>`;
+                    bodyHtml += `<td class="px-2 py-1.5 border-b border-slate-100 max-w-[120px] truncate" title="${escapeHTML(val)}">${display}</td>`;
                 });
                 bodyHtml += `
-                    <td class="sticky-col px-4 py-3 border-b border-slate-100 text-center">
+                    <td class="sticky-col px-2 py-1.5 border-b border-slate-100 text-center">
                         <div class="flex justify-center gap-1">
                             <button onclick="openEditModal('${row._uid}')" class="px-2 py-1 text-blue-600 hover:bg-blue-50 rounded-lg text-xs font-bold transition">編輯</button>
                             <button onclick="confirmDelete('${row._uid}')" class="p-1 text-red-400 hover:bg-red-50 rounded-lg transition"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
@@ -560,9 +560,9 @@
         function renderLogs() {
             const head = document.getElementById('logTableHead'), body = document.getElementById('logBody');
             
-            let hHtml = `<tr><th class="px-4 py-3 font-bold border-b border-slate-200">異動時間</th><th class="px-4 py-3 font-bold border-b border-slate-200">動作</th><th class="px-4 py-3 font-bold border-b border-slate-200">單號</th><th class="px-4 py-3 font-bold border-b border-slate-200">詳細</th><th class="px-4 py-3 font-bold border-b border-slate-200 text-center">定位</th>`;
-            STANDARD_HEADERS.forEach(h => hHtml += `<th class="px-4 py-3 font-bold border-b border-slate-200 text-xs text-slate-400">${escapeHTML(h)}</th>`);
-            hHtml += `<th class="sticky-col-header px-4 py-3 font-bold text-center w-28 border-b border-slate-200">操作</th></tr>`;
+            let hHtml = `<tr><th class="px-2 py-2 font-bold border-b border-slate-200">異動時間</th><th class="px-2 py-2 font-bold border-b border-slate-200">動作</th><th class="px-2 py-2 font-bold border-b border-slate-200">單號</th><th class="px-2 py-2 font-bold border-b border-slate-200">詳細</th><th class="px-2 py-2 font-bold border-b border-slate-200 text-center">定位</th>`;
+            STANDARD_HEADERS.forEach(h => hHtml += `<th class="px-2 py-2 font-bold border-b border-slate-200 text-slate-400">${escapeHTML(h)}</th>`);
+            hHtml += `<th class="sticky-col-header px-2 py-2 font-bold text-center w-16 border-b border-slate-200">操作</th></tr>`;
             head.innerHTML = hHtml;
 
             let displayLogs = appState.logs;
@@ -584,13 +584,13 @@
             }
             
             body.innerHTML = displayLogs.map(log => {
-                let rHtml = `<tr class="text-xs hover:bg-slate-50"><td class="px-4 py-4 font-mono text-slate-400">${escapeHTML(log.time)}</td><td class="px-4 py-4"><span class="px-2 py-1 rounded font-bold ${log.action === '刪除' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}">${escapeHTML(log.action)}</span></td><td class="px-4 py-4 font-bold">${escapeHTML(log.target)}</td><td class="px-4 py-4 text-slate-500 truncate max-w-[200px]" title="${escapeHTML(log.details)}">${escapeHTML(log.details)}</td><td class="px-4 py-4 text-center">${log.uid ? `<button onclick="locateItem('${log.uid}')" class="px-2 py-1 bg-indigo-50 text-indigo-600 rounded font-bold">尋找</button>` : '-'}</td>`;
-                STANDARD_HEADERS.forEach(h => rHtml += `<td class="px-4 py-4 text-slate-400 truncate max-w-[120px]">${escapeHTML(log.rowData?.[h] || "")}</td>`);
+                let rHtml = `<tr class="hover:bg-slate-50"><td class="px-2 py-1.5 font-mono text-slate-400">${escapeHTML(log.time)}</td><td class="px-2 py-1.5"><span class="px-1.5 py-0.5 rounded font-bold ${log.action === '刪除' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}">${escapeHTML(log.action)}</span></td><td class="px-2 py-1.5 font-bold">${escapeHTML(log.target)}</td><td class="px-2 py-1.5 text-slate-500 truncate max-w-[150px]" title="${escapeHTML(log.details)}">${escapeHTML(log.details)}</td><td class="px-2 py-1.5 text-center">${log.uid ? `<button onclick="locateItem('${log.uid}')" class="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded font-bold">尋找</button>` : '-'}</td>`;
+                STANDARD_HEADERS.forEach(h => rHtml += `<td class="px-2 py-1.5 text-slate-400 truncate max-w-[100px]" title="${escapeHTML(log.rowData?.[h] || "")}">${escapeHTML(log.rowData?.[h] || "")}</td>`);
                 
                 rHtml += `
-                    <td class="sticky-col px-4 py-3 border-b border-slate-100 text-center">
+                    <td class="sticky-col px-2 py-1.5 border-b border-slate-100 text-center">
                         <div class="flex justify-center gap-1">
-                            <button onclick="openLogEditModal('${log._logUid}')" class="px-2 py-1 text-blue-600 hover:bg-blue-50 rounded-lg text-xs font-bold transition">編輯</button>
+                            <button onclick="openLogEditModal('${log._logUid}')" class="px-2 py-1 text-blue-600 hover:bg-blue-50 rounded-lg font-bold transition">編輯</button>
                             <button onclick="confirmLogDelete('${log._logUid}')" class="p-1 text-red-400 hover:bg-red-50 rounded-lg transition"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                         </div>
                     </td>`;
