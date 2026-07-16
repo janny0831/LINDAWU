@@ -205,7 +205,9 @@
             logs: [],
             editUid: null,
             isNew: false,
-            editLogUid: null 
+            editLogUid: null,
+            filters: {},
+            logFilters: {}
         };
 
         window.currentSearchTerm = '';
@@ -312,27 +314,56 @@
 
         // 統一更新上方標頭區塊的總計數據（保持完全不透明、精緻邊框與背景配色）
         function updateStats() {
-            let dataFilteredCount = appState.data.length;
-            let logsFilteredCount = appState.logs.length;
-            
+            let displayData = appState.data;
+            Object.keys(appState.filters || {}).forEach(col => {
+                displayData = displayData.filter(row => String(row[col] || "") === appState.filters[col]);
+            });
             if (window.currentSearchTerm) {
                 const term = window.currentSearchTerm.toLowerCase();
-                dataFilteredCount = appState.data.filter(row => STANDARD_HEADERS.some(h => String(row[h] || '').toLowerCase().includes(term))).length;
-                logsFilteredCount = appState.logs.filter(log => {
+                displayData = displayData.filter(row => STANDARD_HEADERS.some(h => String(row[h] || '').toLowerCase().includes(term)));
+            }
+            let dataFilteredCount = displayData.length;
+
+            let displayLogs = appState.logs;
+            Object.keys(appState.logFilters || {}).forEach(col => {
+                displayLogs = displayLogs.filter(log => {
+                    if (['time', 'action', 'target', 'details'].includes(col)) return String(log[col] || "") === appState.logFilters[col];
+                    return String(log.rowData?.[col] || "") === appState.logFilters[col];
+                });
+            });
+            if (window.currentSearchTerm) {
+                const term = window.currentSearchTerm.toLowerCase();
+                displayLogs = displayLogs.filter(log => {
                     return String(log.time || '').toLowerCase().includes(term) ||
                            String(log.action || '').toLowerCase().includes(term) ||
                            String(log.target || '').toLowerCase().includes(term) ||
                            String(log.details || '').toLowerCase().includes(term) ||
                            STANDARD_HEADERS.some(h => String(log.rowData?.[h] || '').toLowerCase().includes(term));
-                }).length;
+                });
             }
+            let logsFilteredCount = displayLogs.length;
 
             const statsEl = document.getElementById('systemStats');
             if (statsEl) {
-                statsEl.innerText = window.currentSearchTerm 
-                    ? `搜尋結果 - 清單: ${dataFilteredCount} | 日誌: ${logsFilteredCount}` 
+                const hasFilters = Object.keys(appState.filters || {}).length > 0 || Object.keys(appState.logFilters || {}).length > 0;
+                statsEl.innerText = (window.currentSearchTerm || hasFilters) 
+                    ? `篩選/搜尋結果 - 清單: ${dataFilteredCount} | 日誌: ${logsFilteredCount}` 
                     : `總計 - 清單: ${dataFilteredCount} 筆 | 日誌: ${logsFilteredCount} 筆`;
             }
+        }
+
+        function handleFilter(column, value) {
+            if (!appState.filters) appState.filters = {};
+            if (value === "") delete appState.filters[column];
+            else appState.filters[column] = value;
+            renderTable();
+        }
+
+        function handleLogFilter(column, value) {
+            if (!appState.logFilters) appState.logFilters = {};
+            if (value === "") delete appState.logFilters[column];
+            else appState.logFilters[column] = value;
+            renderLogs();
         }
 
         function handleSearch(val) {
@@ -364,15 +395,36 @@
         function renderTable() {
             const thead = document.getElementById('tableHead');
             const tbody = document.getElementById('tableBody');
+            
+            if (!appState.filters) appState.filters = {};
             let headHtml = `<tr class="bg-slate-50 text-slate-600 tracking-wider uppercase">`;
-            STANDARD_HEADERS.forEach(h => headHtml += `<th class="px-2 py-2 font-bold border-b border-slate-200">${escapeHTML(h)}</th>`);
-            headHtml += `<th class="sticky-col-header px-2 py-2 font-bold text-center w-16 border-b border-slate-200">操作</th></tr>`;
+            STANDARD_HEADERS.forEach(h => {
+                const uniqueVals = [...new Set(appState.data.map(d => String(d[h] || "")))].filter(Boolean).sort();
+                let options = `<option value="">全部</option>`;
+                uniqueVals.forEach(v => {
+                    const selected = appState.filters[h] === v ? 'selected' : '';
+                    options += `<option value="${escapeHTML(v)}" ${selected}>${escapeHTML(v)}</option>`;
+                });
+                headHtml += `<th class="px-2 py-2 font-bold border-b border-slate-200 align-top">
+                    <div class="flex flex-col gap-1.5">
+                        <span>${escapeHTML(h)}</span>
+                        <select onchange="handleFilter('${h}', this.value)" class="text-[11px] font-normal border border-slate-300 rounded px-1 py-0.5 bg-white text-slate-700 w-full max-w-[120px] focus:outline-none focus:border-blue-400">
+                            ${options}
+                        </select>
+                    </div>
+                </th>`;
+            });
+            headHtml += `<th class="sticky-col-header px-2 py-2 font-bold text-center w-16 border-b border-slate-200 align-top">操作</th></tr>`;
             thead.innerHTML = headHtml;
 
             let displayData = appState.data;
+            Object.keys(appState.filters || {}).forEach(col => {
+                displayData = displayData.filter(row => String(row[col] || "") === appState.filters[col]);
+            });
+
             if (window.currentSearchTerm) {
                 const term = window.currentSearchTerm.toLowerCase();
-                displayData = appState.data.filter(row => STANDARD_HEADERS.some(h => String(row[h] || '').toLowerCase().includes(term)));
+                displayData = displayData.filter(row => STANDARD_HEADERS.some(h => String(row[h] || '').toLowerCase().includes(term)));
             }
 
             let bodyHtml = '';
@@ -560,15 +612,57 @@
         function renderLogs() {
             const head = document.getElementById('logTableHead'), body = document.getElementById('logBody');
             
-            let hHtml = `<tr><th class="px-2 py-2 font-bold border-b border-slate-200">異動時間</th><th class="px-2 py-2 font-bold border-b border-slate-200">動作</th><th class="px-2 py-2 font-bold border-b border-slate-200">單號</th><th class="px-2 py-2 font-bold border-b border-slate-200">詳細</th><th class="px-2 py-2 font-bold border-b border-slate-200 text-center">定位</th>`;
-            STANDARD_HEADERS.forEach(h => hHtml += `<th class="px-2 py-2 font-bold border-b border-slate-200 text-slate-400">${escapeHTML(h)}</th>`);
-            hHtml += `<th class="sticky-col-header px-2 py-2 font-bold text-center w-16 border-b border-slate-200">操作</th></tr>`;
+            if (!appState.logFilters) appState.logFilters = {};
+            
+            const getLogOptions = (col) => {
+                const uniqueVals = [...new Set(appState.logs.map(l => {
+                    if (['time', 'action', 'target', 'details'].includes(col)) return String(l[col] || "");
+                    return String(l.rowData?.[col] || "");
+                }))].filter(Boolean).sort();
+                let options = `<option value="">全部</option>`;
+                uniqueVals.forEach(v => {
+                    const selected = appState.logFilters[col] === v ? 'selected' : '';
+                    options += `<option value="${escapeHTML(v)}" ${selected}>${escapeHTML(v)}</option>`;
+                });
+                return options;
+            };
+
+            const buildTh = (label, col, isMuted = false) => {
+                return `<th class="px-2 py-2 font-bold border-b border-slate-200 align-top ${isMuted ? 'text-slate-400' : ''}">
+                    <div class="flex flex-col gap-1.5">
+                        <span>${escapeHTML(label)}</span>
+                        ${col ? `<select onchange="handleLogFilter('${col}', this.value)" class="text-[11px] font-normal border border-slate-300 rounded px-1 py-0.5 bg-white text-slate-700 w-full max-w-[120px] focus:outline-none focus:border-blue-400">
+                            ${getLogOptions(col)}
+                        </select>` : ''}
+                    </div>
+                </th>`;
+            };
+
+            let hHtml = `<tr>`;
+            hHtml += buildTh('異動時間', 'time');
+            hHtml += buildTh('動作', 'action');
+            hHtml += buildTh('單號', 'target');
+            hHtml += buildTh('詳細', 'details');
+            hHtml += buildTh('定位', null);
+            
+            STANDARD_HEADERS.forEach(h => {
+                hHtml += buildTh(h, h, true);
+            });
+            hHtml += `<th class="sticky-col-header px-2 py-2 font-bold text-center w-16 border-b border-slate-200 align-top">操作</th></tr>`;
             head.innerHTML = hHtml;
 
             let displayLogs = appState.logs;
+            
+            Object.keys(appState.logFilters || {}).forEach(col => {
+                displayLogs = displayLogs.filter(log => {
+                    if (['time', 'action', 'target', 'details'].includes(col)) return String(log[col] || "") === appState.logFilters[col];
+                    return String(log.rowData?.[col] || "") === appState.logFilters[col];
+                });
+            });
+
             if (window.currentSearchTerm) {
                 const term = window.currentSearchTerm.toLowerCase();
-                displayLogs = appState.logs.filter(log => {
+                displayLogs = displayLogs.filter(log => {
                     return String(log.time || '').toLowerCase().includes(term) ||
                            String(log.action || '').toLowerCase().includes(term) ||
                            String(log.target || '').toLowerCase().includes(term) ||
