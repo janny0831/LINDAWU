@@ -24,9 +24,51 @@
             80% { background-color: #fef08a; } 
             100% { background-color: transparent; }
         }
+
+        /* 自訂多選下拉選單樣式 */
+        .dropdown-container {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+            max-width: 140px;
+        }
+        .dropdown-trigger {
+            background-color: white;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.375rem;
+            padding: 0.25rem 0.5rem;
+            font-size: 11px;
+            font-weight: normal;
+            color: #334155;
+            width: 100%;
+            text-align: left;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+        .dropdown-content {
+            display: none;
+            position: absolute;
+            top: 100%;
+            left: 0;
+            background-color: white;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.5rem;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+            z-index: 50;
+            min-width: 200px;
+            max-height: 250px;
+            overflow-y: auto;
+            padding: 0.5rem;
+        }
+        .dropdown-content.show {
+            display: block;
+        }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-800 font-sans min-h-screen relative">
+<body class="bg-slate-50 text-slate-800 font-sans min-h-screen relative" onclick="closeAllDropdowns(event)">
 
     <div class="max-w-[98vw] mx-auto p-4">
         
@@ -94,6 +136,15 @@
             </div>
 
             <div id="page1" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <!-- 新增：清單頁面上方的工具列（複製到異動日誌） -->
+                <div class="bg-indigo-50/60 border-b border-slate-100 p-2.5 flex flex-wrap items-center gap-3">
+                    <button onclick="copySelectedToLogs()" class="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-4 py-1.5 rounded-lg text-sm font-bold transition flex items-center gap-1.5 shadow-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
+                        複製到異動日誌頁面
+                    </button>
+                    <span class="text-xs text-slate-500 font-medium tracking-wide">💡 提示：先勾選第 1 筆，按住 <kbd class="bg-slate-200 px-1 rounded font-mono text-[10px]">Shift</kbd> 鍵再勾選第 10 筆，即可自動連選 1~10 筆；點擊表格文字可直接編輯。</span>
+                </div>
+
                 <div class="overflow-x-auto max-h-[75vh]">
                     <table class="w-full text-xs text-left whitespace-nowrap">
                         <thead id="tableHead" class="sticky-header"></thead>
@@ -103,6 +154,9 @@
             </div>
 
             <div id="page2" class="hidden bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
+                <div class="bg-slate-50 border-b border-slate-100 p-2.5">
+                    <span class="text-xs text-slate-500 font-medium tracking-wide">💡 提示：點擊下方表格內的任何文字即可直接修改，修改將同步更新至資料清單。</span>
+                </div>
                 <div class="overflow-x-auto max-h-[75vh]">
                     <table class="w-full text-xs text-left whitespace-nowrap">
                         <thead id="logTableHead" class="sticky-header text-slate-600"></thead>
@@ -121,7 +175,7 @@
         </div>
     </div>
 
-    <!-- 資料編輯 Modal -->
+    <!-- 資料編輯 Modal (保留用於新增項目) -->
     <div id="editModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[95vh]">
             <div class="p-6 border-b border-slate-100 flex justify-between items-center">
@@ -150,12 +204,12 @@
             <p id="confirmText" class="text-slate-500 mb-8">此操作將無法復原。</p>
             <div class="flex gap-4">
                 <button onclick="closeConfirm()" class="flex-1 px-4 py-3 bg-slate-100 text-slate-700 rounded-xl hover:bg-slate-200 transition font-bold">取消</button>
-                <button id="confirmBtn" class="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition font-bold shadow-lg">確認移除</button>
+                <button id="confirmBtn" onclick="executeDelete()" class="flex-1 px-4 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 transition font-bold shadow-lg">確認移除</button>
             </div>
         </div>
     </div>
 
-    <!-- 日誌編輯 Modal -->
+    <!-- 日誌編輯 Modal (保留結構) -->
     <div id="editLogModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl shadow-2xl w-full max-w-5xl flex flex-col max-h-[95vh]">
             <div class="p-6 border-b border-slate-100 flex justify-between items-center">
@@ -206,8 +260,9 @@
             editUid: null,
             isNew: false,
             editLogUid: null,
-            filters: {},
-            logFilters: {}
+            filters: {}, 
+            logFilters: {},
+            selectedUids: new Set() // 追蹤被勾選的資料UID
         };
 
         window.currentSearchTerm = '';
@@ -218,6 +273,18 @@
         };
 
         const generateLogUid = () => 'log_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+        function formatJustDate(val) {
+            if (!val) return "";
+            const d = new Date(val);
+            if (!isNaN(d.getTime())) {
+                const y = d.getFullYear();
+                const m = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${y}/${m}/${day}`;
+            }
+            return String(val).trim();
+        }
 
         function parseExcelDate(val) {
             if (val === undefined || val === null || val === "") return "";
@@ -283,7 +350,18 @@
                 if (logSheetName) {
                     const logRows = XLSX.utils.sheet_to_json(workbook.Sheets[logSheetName], { defval: "" });
                     importedLogs = logRows.map(l => {
-                        const logObj = { time: l["異動時間"] || "", action: l["動作"] || "", target: l["單號對象"] || "", details: l["詳細內容"] || "", uid: null, _logUid: generateLogUid(), rowData: {} };
+                        const logTimeRaw = l["異動時間"] || "";
+                        const logTimeFormatted = formatJustDate(logTimeRaw);
+
+                        const logObj = { 
+                            time: logTimeFormatted, 
+                            action: l["動作"] || "", 
+                            target: l["單號對象"] || "", 
+                            details: l["詳細內容"] || "", 
+                            uid: null, 
+                            _logUid: generateLogUid(), 
+                            rowData: {} 
+                        };
                         STANDARD_HEADERS.forEach(h => {
                             let cellVal = l[h] || "";
                             if (DATE_FIELDS.includes(h)) cellVal = parseExcelDate(cellVal);
@@ -297,6 +375,7 @@
 
                 appState.data = importedData;
                 appState.logs = importedLogs.reverse();
+                appState.selectedUids.clear(); // 清空勾選紀錄
                 initSystemView();
             };
             reader.readAsArrayBuffer(file);
@@ -312,11 +391,13 @@
             renderLogs();
         }
 
-        // 統一更新上方標頭區塊的總計數據（保持完全不透明、精緻邊框與背景配色）
         function updateStats() {
             let displayData = appState.data;
             Object.keys(appState.filters || {}).forEach(col => {
-                displayData = displayData.filter(row => String(row[col] || "") === appState.filters[col]);
+                const selectedVals = appState.filters[col];
+                if (selectedVals && selectedVals.length > 0) {
+                    displayData = displayData.filter(row => selectedVals.includes(String(row[col] || "")));
+                }
             });
             if (window.currentSearchTerm) {
                 const term = window.currentSearchTerm.toLowerCase();
@@ -326,10 +407,15 @@
 
             let displayLogs = appState.logs;
             Object.keys(appState.logFilters || {}).forEach(col => {
-                displayLogs = displayLogs.filter(log => {
-                    if (['time', 'action', 'target', 'details'].includes(col)) return String(log[col] || "") === appState.logFilters[col];
-                    return String(log.rowData?.[col] || "") === appState.logFilters[col];
-                });
+                const selectedVals = appState.logFilters[col];
+                if (selectedVals && selectedVals.length > 0) {
+                    displayLogs = displayLogs.filter(log => {
+                        if (['time', 'action', 'target', 'details'].includes(col)) {
+                            return selectedVals.includes(String(log[col] || ""));
+                        }
+                        return selectedVals.includes(String(log.rowData?.[col] || ""));
+                    });
+                }
             });
             if (window.currentSearchTerm) {
                 const term = window.currentSearchTerm.toLowerCase();
@@ -345,25 +431,243 @@
 
             const statsEl = document.getElementById('systemStats');
             if (statsEl) {
-                const hasFilters = Object.keys(appState.filters || {}).length > 0 || Object.keys(appState.logFilters || {}).length > 0;
+                const hasFilters = Object.values(appState.filters || {}).some(v => v && v.length > 0) || 
+                                   Object.values(appState.logFilters || {}).some(v => v && v.length > 0);
                 statsEl.innerText = (window.currentSearchTerm || hasFilters) 
                     ? `篩選/搜尋結果 - 清單: ${dataFilteredCount} | 日誌: ${logsFilteredCount}` 
                     : `總計 - 清單: ${dataFilteredCount} 筆 | 日誌: ${logsFilteredCount} 筆`;
             }
         }
 
-        function handleFilter(column, value) {
-            if (!appState.filters) appState.filters = {};
-            if (value === "") delete appState.filters[column];
-            else appState.filters[column] = value;
-            renderTable();
+        // Inline Edit (Excel-like) 資料清單處理函式
+        window.handleDataInlineEdit = function(uid, field, rawValue) {
+            const newValue = rawValue.replace(/\n/g, '').trim();
+            const row = appState.data.find(d => d._uid === uid);
+            if (row && row[field] !== newValue) {
+                const oldValue = row[field];
+                row[field] = newValue;
+                
+                // 新增異動日誌紀錄
+                const timestamp = formatJustDate(new Date());
+                appState.logs.unshift({ 
+                    time: timestamp, 
+                    action: '修正', 
+                    target: row['保管單號碼'] || '無單號', 
+                    details: `[${field}]：${oldValue || '空'}➔${newValue || '空'}`, 
+                    uid: row._uid, 
+                    _logUid: generateLogUid(), 
+                    rowData: {...row} 
+                });
+
+                // 更新畫面以套用新的顏色排版等
+                renderTable();
+                renderLogs();
+            }
+        };
+
+        // Inline Edit (Excel-like) 異動日誌處理函式 (包含同步回清單)
+        window.handleLogInlineEdit = function(logUid, field, rawValue, isRowData) {
+            const newValue = rawValue.replace(/\n/g, '').trim();
+            const log = appState.logs.find(l => l._logUid === logUid);
+            if (!log) return;
+            
+            let changed = false;
+            if (isRowData) {
+                if (log.rowData[field] !== newValue) {
+                    log.rowData[field] = newValue;
+                    changed = true;
+                }
+            } else {
+                if (log[field] !== newValue) {
+                    log[field] = newValue;
+                    changed = true;
+                }
+            }
+            
+            if (changed) {
+                // 如果日誌有綁定原始資料 (uid)，則同步更新原資料清單
+                if (log.uid) {
+                    const dataRow = appState.data.find(d => d._uid === log.uid);
+                    if (dataRow) {
+                        if (isRowData) {
+                            dataRow[field] = newValue;
+                        } else if (field === 'target') {
+                            dataRow['保管單號碼'] = newValue;
+                        }
+                    }
+                    // 資料更改了，重繪背景的清單頁面
+                    renderTable();
+                }
+                renderLogs();
+            }
+        };
+
+        // 打勾與 Shift 連選機制
+        let lastCheckedIdx = -1;
+        window.handleRowCheck = function(e, uid, currentIdx) {
+            if (e.shiftKey && lastCheckedIdx !== -1) {
+                // 利用 DOM 中的順序做連選 (不受篩選器亂序影響)
+                const checkboxes = Array.from(document.querySelectorAll('.row-checkbox'));
+                const startNode = checkboxes.find(c => parseInt(c.getAttribute('data-index')) === lastCheckedIdx);
+                const currentNode = checkboxes.find(c => parseInt(c.getAttribute('data-index')) === currentIdx);
+                
+                if (startNode && currentNode) {
+                    const startIndex = checkboxes.indexOf(startNode);
+                    const endIndex = checkboxes.indexOf(currentNode);
+                    
+                    const minIdx = Math.min(startIndex, endIndex);
+                    const maxIdx = Math.max(startIndex, endIndex);
+                    
+                    for (let i = minIdx; i <= maxIdx; i++) {
+                        checkboxes[i].checked = e.target.checked;
+                        const rUid = checkboxes[i].getAttribute('data-uid');
+                        if (e.target.checked) {
+                            appState.selectedUids.add(rUid);
+                        } else {
+                            appState.selectedUids.delete(rUid);
+                        }
+                    }
+                }
+            } else {
+                if (e.target.checked) {
+                    appState.selectedUids.add(uid);
+                } else {
+                    appState.selectedUids.delete(uid);
+                }
+            }
+            lastCheckedIdx = currentIdx;
+        };
+
+        // 複製已勾選項至異動日誌
+        window.copySelectedToLogs = function() {
+            if (!appState.selectedUids || appState.selectedUids.size === 0) {
+                alert('請先在操作欄勾選要複製的項目');
+                return;
+            }
+            const timestamp = formatJustDate(new Date());
+            let copiedCount = 0;
+            appState.selectedUids.forEach(uid => {
+                const row = appState.data.find(d => d._uid === uid);
+                if (row) {
+                    appState.logs.unshift({ 
+                        time: timestamp, 
+                        action: '複製', 
+                        target: row['保管單號碼'] || '', 
+                        details: '自清單複製', 
+                        uid: row._uid, 
+                        _logUid: generateLogUid(), 
+                        rowData: {...row} 
+                    });
+                    copiedCount++;
+                }
+            });
+            
+            // 清空打勾狀態
+            appState.selectedUids.clear();
+            const boxes = document.querySelectorAll('.row-checkbox');
+            boxes.forEach(b => b.checked = false);
+            
+            updateStats();
+            renderLogs(); // 更新日誌以供檢視
+            alert(`✅ 已成功複製 ${copiedCount} 筆資料至異動日誌！`);
+        };
+
+
+        function toggleDropdown(e, colId) {
+            e.stopPropagation();
+            const el = document.getElementById(colId);
+            const isOpen = el.classList.contains('show');
+            closeAllDropdowns();
+            if (!isOpen) {
+                el.classList.add('show');
+            }
         }
 
-        function handleLogFilter(column, value) {
+        function closeAllDropdowns(e) {
+            const dropdowns = document.querySelectorAll('.dropdown-content');
+            dropdowns.forEach(d => d.classList.remove('show'));
+        }
+
+        function handleSelectAll(checkbox, dropdownId) {
+            const parent = document.getElementById(dropdownId);
+            const items = parent.querySelectorAll('.filter-item-checkbox');
+            items.forEach(cb => {
+                cb.checked = checkbox.checked;
+            });
+        }
+
+        function resetDropdownSelection(dropdownId) {
+            const parent = document.getElementById(dropdownId);
+            const items = parent.querySelectorAll('.filter-item-checkbox');
+            items.forEach(cb => {
+                cb.checked = false;
+            });
+            const allCb = parent.querySelector('.select-all-checkbox');
+            if(allCb) allCb.checked = false;
+        }
+
+        function confirmFilter(column, dropdownId) {
+            const parent = document.getElementById(dropdownId);
+            const items = parent.querySelectorAll('.filter-item-checkbox');
+            const selectedValues = [];
+            items.forEach(cb => {
+                if (cb.checked) {
+                    selectedValues.push(cb.value);
+                }
+            });
+
+            if (!appState.filters) appState.filters = {};
+            if (selectedValues.length === 0) {
+                delete appState.filters[column];
+            } else {
+                appState.filters[column] = selectedValues;
+            }
+            
+            const triggerText = document.getElementById(`trigger-text-${dropdownId}`);
+            if (triggerText) {
+                if (selectedValues.length === 0) {
+                    triggerText.innerText = "全部";
+                } else if (selectedValues.length === 1) {
+                    triggerText.innerText = selectedValues[0] === "" ? "(空白)" : selectedValues[0];
+                } else {
+                    triggerText.innerText = `已選 (${selectedValues.length})`;
+                }
+            }
+
+            renderTable();
+            closeAllDropdowns();
+        }
+
+        function confirmLogFilter(column, dropdownId) {
+            const parent = document.getElementById(dropdownId);
+            const items = parent.querySelectorAll('.filter-item-checkbox');
+            const selectedValues = [];
+            items.forEach(cb => {
+                if (cb.checked) {
+                    selectedValues.push(cb.value);
+                }
+            });
+
             if (!appState.logFilters) appState.logFilters = {};
-            if (value === "") delete appState.logFilters[column];
-            else appState.logFilters[column] = value;
+            if (selectedValues.length === 0) {
+                delete appState.logFilters[column];
+            } else {
+                appState.logFilters[column] = selectedValues;
+            }
+            
+            const triggerText = document.getElementById(`trigger-text-${dropdownId}`);
+            if (triggerText) {
+                if (selectedValues.length === 0) {
+                    triggerText.innerText = "全部";
+                } else if (selectedValues.length === 1) {
+                    triggerText.innerText = selectedValues[0] === "" ? "(空白)" : selectedValues[0];
+                } else {
+                    triggerText.innerText = `已選 (${selectedValues.length})`;
+                }
+            }
+
             renderLogs();
+            closeAllDropdowns();
         }
 
         function handleSearch(val) {
@@ -398,19 +702,52 @@
             
             if (!appState.filters) appState.filters = {};
             let headHtml = `<tr class="bg-slate-50 text-slate-600 tracking-wider uppercase">`;
-            STANDARD_HEADERS.forEach(h => {
-                const uniqueVals = [...new Set(appState.data.map(d => String(d[h] || "")))].filter(Boolean).sort();
-                let options = `<option value="">全部</option>`;
-                uniqueVals.forEach(v => {
-                    const selected = appState.filters[h] === v ? 'selected' : '';
-                    options += `<option value="${escapeHTML(v)}" ${selected}>${escapeHTML(v)}</option>`;
+            
+            STANDARD_HEADERS.forEach((h, idx) => {
+                const uniqueVals = [...new Set(appState.data.map(d => String(d[h] || "")))].sort();
+                const dropdownId = `dropdown-list-${idx}`;
+                const currentlySelected = appState.filters[h] || [];
+                
+                let checkboxesHtml = '';
+                uniqueVals.forEach((v, vIdx) => {
+                    const isChecked = currentlySelected.includes(v) ? 'checked' : '';
+                    const displayLabel = v === "" ? "(空白)" : v;
+                    checkboxesHtml += `
+                        <label class="flex items-center gap-2 px-2 py-1 hover:bg-slate-50 rounded cursor-pointer text-slate-700">
+                            <input type="checkbox" value="${escapeHTML(v)}" ${isChecked} class="filter-item-checkbox rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                            <span class="truncate" title="${escapeHTML(displayLabel)}">${escapeHTML(displayLabel)}</span>
+                        </label>
+                    `;
                 });
-                headHtml += `<th class="px-2 py-2 font-bold border-b border-slate-200 align-top">
+
+                const isAllChecked = (currentlySelected.length > 0 && currentlySelected.length === uniqueVals.length) ? 'checked' : '';
+                const buttonLabel = currentlySelected.length === 0 ? "全部" : (currentlySelected.length === 1 ? (currentlySelected[0] === "" ? "(空白)" : currentlySelected[0]) : `已選 (${currentlySelected.length})`);
+
+                headHtml += `
+                <th class="px-2 py-2 font-bold border-b border-slate-200 align-top">
                     <div class="flex flex-col gap-1.5">
                         <span>${escapeHTML(h)}</span>
-                        <select onchange="handleFilter('${h}', this.value)" class="text-[11px] font-normal border border-slate-300 rounded px-1 py-0.5 bg-white text-slate-700 w-full max-w-[120px] focus:outline-none focus:border-blue-400">
-                            ${options}
-                        </select>
+                        <div class="dropdown-container">
+                            <div class="dropdown-trigger" onclick="toggleDropdown(event, '${dropdownId}')">
+                                <span class="truncate mr-1" id="trigger-text-${dropdownId}">${escapeHTML(buttonLabel)}</span>
+                                <svg class="h-3 w-3 text-slate-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                            </div>
+                            <div class="dropdown-content" id="${dropdownId}" onclick="event.stopPropagation()">
+                                <div class="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
+                                    <label class="flex items-center gap-2 font-bold text-slate-800">
+                                        <input type="checkbox" ${isAllChecked} onchange="handleSelectAll(this, '${dropdownId}')" class="select-all-checkbox rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                                        <span>全選</span>
+                                    </label>
+                                    <div class="flex gap-1">
+                                        <button onclick="resetDropdownSelection('${dropdownId}')" class="px-1.5 py-0.5 border border-slate-200 hover:bg-slate-100 text-[10px] rounded font-medium text-slate-500">重設</button>
+                                        <button onclick="confirmFilter('${escapeHTML(h)}', '${dropdownId}')" class="px-2 py-0.5 bg-blue-600 hover:bg-blue-700 text-[10px] text-white rounded font-bold">確定</button>
+                                    </div>
+                                </div>
+                                <div class="space-y-1 overflow-y-auto max-h-[160px] text-left">
+                                    ${checkboxesHtml}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </th>`;
             });
@@ -419,7 +756,10 @@
 
             let displayData = appState.data;
             Object.keys(appState.filters || {}).forEach(col => {
-                displayData = displayData.filter(row => String(row[col] || "") === appState.filters[col]);
+                const selectedVals = appState.filters[col];
+                if (selectedVals && selectedVals.length > 0) {
+                    displayData = displayData.filter(row => selectedVals.includes(String(row[col] || "")));
+                }
             });
 
             if (window.currentSearchTerm) {
@@ -428,24 +768,32 @@
             }
 
             let bodyHtml = '';
+            let rowIndex = 0;
             displayData.forEach(row => {
                 bodyHtml += `<tr id="row-${row._uid}" class="hover:bg-blue-50/40 transition-colors">`;
                 STANDARD_HEADERS.forEach(h => {
                     const val = row[h] || "";
                     let display = escapeHTML(val);
+                    let colorClass = 'text-slate-700';
                     if (h === "是否盤點") {
-                        const style = val === 'Y' ? 'bg-green-100 text-green-700' : (val === 'N' ? 'bg-red-100 text-red-700' : 'bg-slate-100 text-slate-400');
-                        display = `<span class="px-1.5 py-0.5 rounded text-[10px] font-black ${style}">${val || 'N'}</span>`;
+                        colorClass = val === 'Y' ? 'text-green-700 font-black' : (val === 'N' ? 'text-red-700 font-black' : 'text-slate-400 font-black');
                     }
-                    bodyHtml += `<td class="px-2 py-1.5 border-b border-slate-100 max-w-[120px] truncate" title="${escapeHTML(val)}">${display}</td>`;
+                    // Excel 直覺編輯輸入框設計
+                    bodyHtml += `<td class="px-2 py-1.5 border-b border-slate-100 max-w-[120px] ${colorClass}">
+                        <div contenteditable="true" onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}" onblur="handleDataInlineEdit('${row._uid}', '${h}', this.innerText)" class="outline-none focus:bg-white focus:ring-2 focus:ring-blue-400 rounded px-1 min-h-[1.25rem] truncate focus:text-clip focus:overflow-visible focus:max-w-none hover:bg-slate-50 transition-colors cursor-text" title="${escapeHTML(val)}">${display}</div>
+                    </td>`;
                 });
+                
+                const isChecked = appState.selectedUids.has(row._uid) ? 'checked' : '';
                 bodyHtml += `
                     <td class="sticky-col px-2 py-1.5 border-b border-slate-100 text-center">
-                        <div class="flex justify-center gap-1">
-                            <button onclick="openEditModal('${row._uid}')" class="px-2 py-1 text-blue-600 hover:bg-blue-50 rounded-lg text-xs font-bold transition">編輯</button>
-                            <button onclick="confirmDelete('${row._uid}')" class="p-1 text-red-400 hover:bg-red-50 rounded-lg transition"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                        <div class="flex justify-center items-center gap-2">
+                            <!-- 已移除原先的編輯按鈕，加入多選 checkbox -->
+                            <input type="checkbox" class="row-checkbox w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" data-uid="${row._uid}" data-index="${rowIndex}" ${isChecked} onclick="handleRowCheck(event, '${row._uid}', ${rowIndex})">
+                            <button onclick="confirmDelete('${row._uid}')" class="p-1 text-red-400 hover:bg-red-50 rounded-lg transition" title="刪除"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                         </div>
                     </td></tr>`;
+                rowIndex++;
             });
             tbody.innerHTML = bodyHtml;
             updateStats();
@@ -458,6 +806,7 @@
             document.getElementById('page1').classList.toggle('hidden', tabId !== 'page1');
             document.getElementById('page2').classList.toggle('hidden', tabId !== 'page2');
             if (tabId === 'page2') renderLogs();
+            if (tabId === 'page1') renderTable(); // 切回清單時，確保同步渲染已被異動的資料
         }
 
         function openAddModal() {
@@ -493,7 +842,7 @@
 
         function handleFormSubmit(e) {
             e.preventDefault();
-            const formData = new FormData(e.target), newValues = {}, timestamp = new Date().toLocaleString('zh-TW', { hour12: false });
+            const formData = new FormData(e.target), newValues = {}, timestamp = formatJustDate(new Date());
             STANDARD_HEADERS.forEach(h => {
                 let val = formData.get(h);
                 if (val && DATE_FIELDS.includes(h)) val = val.replace(/-/g, '/');
@@ -525,7 +874,7 @@
         function executeDelete() {
             const row = appState.data.find(d => d._uid === pendingDeleteUid);
             appState.data = appState.data.filter(d => d._uid !== pendingDeleteUid);
-            appState.logs.unshift({ time: new Date().toLocaleString('zh-TW', { hour12: false }), action: '刪除', target: row['保管單號碼'] || '系統', details: `移除：${row['品名']}`, uid: null, _logUid: generateLogUid(), rowData: {...row} });
+            appState.logs.unshift({ time: formatJustDate(new Date()), action: '刪除', target: row['保管單號碼'] || '系統', details: `移除：${row['品名']}`, uid: null, _logUid: generateLogUid(), rowData: {...row} });
             renderTable(); renderLogs(); closeConfirm();
             if (appState.data.length === 0) {
                 document.getElementById('mainContent').classList.add('hidden');
@@ -579,7 +928,7 @@
             const idx = appState.logs.findIndex(l => l._logUid === appState.editLogUid);
             
             if (idx !== -1) {
-                appState.logs[idx].time = formData.get('time') || "";
+                appState.logs[idx].time = formatJustDate(formData.get('time') || "");
                 appState.logs[idx].action = formData.get('action') || "";
                 appState.logs[idx].target = formData.get('target') || "";
                 appState.logs[idx].details = formData.get('details') || "";
@@ -614,39 +963,78 @@
             
             if (!appState.logFilters) appState.logFilters = {};
             
-            const getLogOptions = (col) => {
-                const uniqueVals = [...new Set(appState.logs.map(l => {
+            const getLogOptionsList = (col) => {
+                return [...new Set(appState.logs.map(l => {
                     if (['time', 'action', 'target', 'details'].includes(col)) return String(l[col] || "");
                     return String(l.rowData?.[col] || "");
-                }))].filter(Boolean).sort();
-                let options = `<option value="">全部</option>`;
-                uniqueVals.forEach(v => {
-                    const selected = appState.logFilters[col] === v ? 'selected' : '';
-                    options += `<option value="${escapeHTML(v)}" ${selected}>${escapeHTML(v)}</option>`;
-                });
-                return options;
+                }))].sort();
             };
 
-            const buildTh = (label, col, isMuted = false) => {
+            const buildTh = (label, col, idxSuffix, isMuted = false) => {
+                if (!col) {
+                    return `<th class="px-2 py-2 font-bold border-b border-slate-200 align-top ${isMuted ? 'text-slate-400' : ''}">
+                        <div class="flex flex-col gap-1.5">
+                            <span>${escapeHTML(label)}</span>
+                        </div>
+                    </th>`;
+                }
+
+                const uniqueVals = getLogOptionsList(col);
+                const dropdownId = `dropdown-log-${idxSuffix}`;
+                const currentlySelected = appState.logFilters[col] || [];
+                
+                let checkboxesHtml = '';
+                uniqueVals.forEach(v => {
+                    const isChecked = currentlySelected.includes(v) ? 'checked' : '';
+                    const displayLabel = v === "" ? "(空白)" : v;
+                    checkboxesHtml += `
+                        <label class="flex items-center gap-2 px-2 py-1 hover:bg-slate-50 rounded cursor-pointer text-slate-700">
+                            <input type="checkbox" value="${escapeHTML(v)}" ${isChecked} class="filter-item-checkbox rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                            <span class="truncate" title="${escapeHTML(displayLabel)}">${escapeHTML(displayLabel)}</span>
+                        </label>
+                    `;
+                });
+
+                const isAllChecked = (currentlySelected.length > 0 && currentlySelected.length === uniqueVals.length) ? 'checked' : '';
+                const buttonLabel = currentlySelected.length === 0 ? "全部" : (currentlySelected.length === 1 ? (currentlySelected[0] === "" ? "(空白)" : currentlySelected[0]) : `已選 (${currentlySelected.length})`);
+
                 return `<th class="px-2 py-2 font-bold border-b border-slate-200 align-top ${isMuted ? 'text-slate-400' : ''}">
                     <div class="flex flex-col gap-1.5">
                         <span>${escapeHTML(label)}</span>
-                        ${col ? `<select onchange="handleLogFilter('${col}', this.value)" class="text-[11px] font-normal border border-slate-300 rounded px-1 py-0.5 bg-white text-slate-700 w-full max-w-[120px] focus:outline-none focus:border-blue-400">
-                            ${getLogOptions(col)}
-                        </select>` : ''}
+                        <div class="dropdown-container">
+                            <div class="dropdown-trigger" onclick="toggleDropdown(event, '${dropdownId}')">
+                                <span class="truncate mr-1" id="trigger-text-${dropdownId}">${escapeHTML(buttonLabel)}</span>
+                                <svg class="h-3 w-3 text-slate-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" /></svg>
+                            </div>
+                            <div class="dropdown-content" id="${dropdownId}" onclick="event.stopPropagation()">
+                                <div class="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
+                                    <label class="flex items-center gap-2 font-bold text-slate-800">
+                                        <input type="checkbox" ${isAllChecked} onchange="handleSelectAll(this, '${dropdownId}')" class="select-all-checkbox rounded border-slate-300 text-blue-600 focus:ring-blue-500">
+                                        <span>全選</span>
+                                    </label>
+                                    <div class="flex gap-1">
+                                        <button onclick="resetDropdownSelection('${dropdownId}')" class="px-1.5 py-0.5 border border-slate-200 hover:bg-slate-100 text-[10px] rounded font-medium text-slate-500">重設</button>
+                                        <button onclick="confirmLogFilter('${escapeHTML(col)}', '${dropdownId}')" class="px-2 py-0.5 bg-blue-600 hover:bg-blue-700 text-[10px] text-white rounded font-bold">確定</button>
+                                    </div>
+                                </div>
+                                <div class="space-y-1 overflow-y-auto max-h-[160px] text-left">
+                                    ${checkboxesHtml}
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </th>`;
             };
 
             let hHtml = `<tr>`;
-            hHtml += buildTh('異動時間', 'time');
-            hHtml += buildTh('動作', 'action');
-            hHtml += buildTh('單號', 'target');
-            hHtml += buildTh('詳細', 'details');
-            hHtml += buildTh('定位', null);
+            hHtml += buildTh('異動時間', 'time', 'time');
+            hHtml += buildTh('動作', 'action', 'action');
+            hHtml += buildTh('單號', 'target', 'target');
+            hHtml += buildTh('詳細', 'details', 'details');
+            hHtml += buildTh('定位', null, 'locate');
             
-            STANDARD_HEADERS.forEach(h => {
-                hHtml += buildTh(h, h, true);
+            STANDARD_HEADERS.forEach((h, idx) => {
+                hHtml += buildTh(h, h, `std-${idx}`, true);
             });
             hHtml += `<th class="sticky-col-header px-2 py-2 font-bold text-center w-16 border-b border-slate-200 align-top">操作</th></tr>`;
             head.innerHTML = hHtml;
@@ -654,10 +1042,15 @@
             let displayLogs = appState.logs;
             
             Object.keys(appState.logFilters || {}).forEach(col => {
-                displayLogs = displayLogs.filter(log => {
-                    if (['time', 'action', 'target', 'details'].includes(col)) return String(log[col] || "") === appState.logFilters[col];
-                    return String(log.rowData?.[col] || "") === appState.logFilters[col];
-                });
+                const selectedVals = appState.logFilters[col];
+                if (selectedVals && selectedVals.length > 0) {
+                    displayLogs = displayLogs.filter(log => {
+                        if (['time', 'action', 'target', 'details'].includes(col)) {
+                            return selectedVals.includes(String(log[col] || ""));
+                        }
+                        return selectedVals.includes(String(log.rowData?.[col] || ""));
+                    });
+                }
             });
 
             if (window.currentSearchTerm) {
@@ -678,14 +1071,25 @@
             }
             
             body.innerHTML = displayLogs.map(log => {
-                let rHtml = `<tr class="hover:bg-slate-50"><td class="px-2 py-1.5 font-mono text-slate-400">${escapeHTML(log.time)}</td><td class="px-2 py-1.5"><span class="px-1.5 py-0.5 rounded font-bold ${log.action === '刪除' ? 'bg-red-50 text-red-600' : 'bg-blue-50 text-blue-600'}">${escapeHTML(log.action)}</span></td><td class="px-2 py-1.5 font-bold">${escapeHTML(log.target)}</td><td class="px-2 py-1.5 text-slate-500 truncate max-w-[150px]" title="${escapeHTML(log.details)}">${escapeHTML(log.details)}</td><td class="px-2 py-1.5 text-center">${log.uid ? `<button onclick="locateItem('${log.uid}')" class="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded font-bold">尋找</button>` : '-'}</td>`;
-                STANDARD_HEADERS.forEach(h => rHtml += `<td class="px-2 py-1.5 text-slate-400 truncate max-w-[100px]" title="${escapeHTML(log.rowData?.[h] || "")}">${escapeHTML(log.rowData?.[h] || "")}</td>`);
+                const displayTime = formatJustDate(log.time);
+                
+                // 日誌也全部改為 Inline Edit，並移除編輯按鈕
+                let rHtml = `<tr class="hover:bg-slate-50">
+                    <td class="px-2 py-1.5 font-mono text-slate-400"><div contenteditable="true" onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}" onblur="handleLogInlineEdit('${log._logUid}', 'time', this.innerText, false)" class="outline-none focus:bg-white focus:ring-2 focus:ring-blue-400 rounded px-1 min-h-[1.25rem] hover:bg-white transition-colors cursor-text">${escapeHTML(displayTime)}</div></td>
+                    <td class="px-2 py-1.5 font-bold"><div contenteditable="true" onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}" onblur="handleLogInlineEdit('${log._logUid}', 'action', this.innerText, false)" class="outline-none focus:bg-white focus:ring-2 focus:ring-blue-400 rounded px-1 min-h-[1.25rem] hover:bg-white transition-colors cursor-text ${log.action === '刪除' ? 'text-red-600' : 'text-blue-600'}">${escapeHTML(log.action)}</div></td>
+                    <td class="px-2 py-1.5 font-bold"><div contenteditable="true" onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}" onblur="handleLogInlineEdit('${log._logUid}', 'target', this.innerText, false)" class="outline-none focus:bg-white focus:ring-2 focus:ring-blue-400 rounded px-1 min-h-[1.25rem] hover:bg-white transition-colors cursor-text">${escapeHTML(log.target)}</div></td>
+                    <td class="px-2 py-1.5 text-slate-500 max-w-[150px]"><div contenteditable="true" onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}" onblur="handleLogInlineEdit('${log._logUid}', 'details', this.innerText, false)" class="outline-none focus:bg-white focus:ring-2 focus:ring-blue-400 rounded px-1 min-h-[1.25rem] truncate focus:text-clip focus:overflow-visible focus:max-w-none hover:bg-white transition-colors cursor-text" title="${escapeHTML(log.details)}">${escapeHTML(log.details)}</div></td>
+                    <td class="px-2 py-1.5 text-center">${log.uid ? `<button onclick="locateItem('${log.uid}')" class="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded font-bold">尋找</button>` : '-'}</td>`;
+                
+                STANDARD_HEADERS.forEach(h => {
+                    rHtml += `<td class="px-2 py-1.5 text-slate-400 max-w-[100px]"><div contenteditable="true" onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}" onblur="handleLogInlineEdit('${log._logUid}', '${h}', this.innerText, true)" class="outline-none focus:bg-white focus:ring-2 focus:ring-blue-400 rounded px-1 min-h-[1.25rem] truncate focus:text-clip focus:overflow-visible focus:max-w-none hover:bg-white transition-colors cursor-text" title="${escapeHTML(log.rowData?.[h] || "")}">${escapeHTML(log.rowData?.[h] || "")}</div></td>`;
+                });
                 
                 rHtml += `
                     <td class="sticky-col px-2 py-1.5 border-b border-slate-100 text-center">
                         <div class="flex justify-center gap-1">
-                            <button onclick="openLogEditModal('${log._logUid}')" class="px-2 py-1 text-blue-600 hover:bg-blue-50 rounded-lg font-bold transition">編輯</button>
-                            <button onclick="confirmLogDelete('${log._logUid}')" class="p-1 text-red-400 hover:bg-red-50 rounded-lg transition"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                            <!-- 已移除原先日誌編輯按鈕 -->
+                            <button onclick="confirmLogDelete('${log._logUid}')" class="p-1 text-red-400 hover:bg-red-50 rounded-lg transition" title="刪除"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                         </div>
                     </td>`;
                 return rHtml + `</tr>`;
@@ -697,7 +1101,7 @@
         function exportToExcel() {
             const listWs = XLSX.utils.json_to_sheet(appState.data.map(({ _uid, ...r }) => r));
             const logWs = XLSX.utils.json_to_sheet(appState.logs.map(l => {
-                let o = { "異動時間": l.time, "動作": l.action, "單號對象": l.target, "詳細內容": l.details };
+                let o = { "異動時間": formatJustDate(l.time), "動作": l.action, "單號對象": l.target, "詳細內容": l.details };
                 if (l.rowData) STANDARD_HEADERS.forEach(h => o[h] = l.rowData[h] || "");
                 return o;
             }));
@@ -728,10 +1132,12 @@
                 if (result.status === 'success') {
                     appState.data = result.data || [];
                     
-                    // 從雲端載入時，將被攤平(Flatten)的欄位重新組裝成 rowData 以維持系統現有架構
                     appState.logs = (result.logs || []).map(flatLog => {
+                        const logTimeRaw = flatLog["異動時間"] || flatLog.time || "";
+                        const logTimeFormatted = formatJustDate(logTimeRaw);
+
                         let log = {
-                            time: flatLog["異動時間"] || flatLog.time || "",
+                            time: logTimeFormatted,
                             action: flatLog["動作"] || flatLog.action || "",
                             target: flatLog["單號對象"] || flatLog.target || "",
                             details: flatLog["詳細內容"] || flatLog.details || "",
@@ -740,11 +1146,9 @@
                             rowData: {}
                         };
                         
-                        // 為了相容您原本已經寫進去的舊資料 (如果有舊的 JSON 字串)
                         if (flatLog.rowData && typeof flatLog.rowData === 'string') {
                             try { log.rowData = JSON.parse(flatLog.rowData); } catch(e) {}
                         } else {
-                            // 將新版的純文字欄位一一對應抓進來
                             STANDARD_HEADERS.forEach(h => {
                                 log.rowData[h] = flatLog[h] !== undefined ? flatLog[h] : "";
                             });
@@ -753,6 +1157,7 @@
                     });
                     
                     if (appState.data.length > 0 || appState.logs.length > 0) {
+                        appState.selectedUids.clear(); // 清空勾選紀錄
                         initSystemView();
                         alert('✅ 雲端資料載入成功！');
                     } else {
@@ -786,9 +1191,8 @@
             btn.disabled = true;
 
             try {
-                // 為了讓 Google Sheet 顯示正常表頭，把巢狀的 rowData 攤平 (Flatten) 傳送
                 const flattenedLogs = appState.logs.map(l => {
-                    let o = { "異動時間": l.time, "動作": l.action, "單號對象": l.target, "詳細內容": l.details, "uid": l.uid, "_logUid": l._logUid };
+                    let o = { "異動時間": formatJustDate(l.time), "動作": l.action, "單號對象": l.target, "詳細內容": l.details, "uid": l.uid, "_logUid": l._logUid };
                     if (l.rowData) STANDARD_HEADERS.forEach(h => o[h] = l.rowData[h] || "");
                     return o;
                 });
@@ -818,7 +1222,6 @@
             }
         }
 
-        // 初始化時執行一次統計資料更新，確保開局顯示正確預設值
         updateStats();
 
     </script>
