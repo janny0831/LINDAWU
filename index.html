@@ -81,7 +81,6 @@
                     大量(管理部)保管品管理系統
                 </h1>
                 <p class="text-sm text-slate-500 mt-1">已實作智慧型日期偵測，自動將 Excel 序號轉換為 YYYY/MM/DD 格式。</p>
-                <!-- 調整位置與樣式：將資料總計移至此處，並改為不透明且高質感的狀態標籤 -->
                 <div class="mt-2.5">
                     <span id="systemStats" class="inline-flex items-center gap-1.5 px-3 py-1 bg-blue-50 border border-blue-200 text-blue-700 text-xs font-bold rounded-full shadow-sm">
                         總計 - 清單: 0 筆 | 日誌: 0 筆
@@ -96,13 +95,11 @@
                     匯入 Excel
                 </label>
 
-                <!-- 雲端載入按鈕 -->
                 <button id="loadGasBtn" onclick="loadFromGAS()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-medium py-2.5 px-6 rounded-lg transition flex items-center gap-2 shadow-sm">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                     從雲端載入
                 </button>
                 
-                <!-- 同步雲端按鈕 -->
                 <button id="syncGasBtn" onclick="syncToGAS()" class="bg-indigo-600 hover:bg-indigo-700 text-white font-medium py-2.5 px-6 rounded-lg transition flex items-center gap-2 shadow-sm hidden">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
                     同步至雲端
@@ -136,7 +133,6 @@
             </div>
 
             <div id="page1" class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-                <!-- 新增：清單頁面上方的工具列（複製到異動日誌） -->
                 <div class="bg-indigo-50/60 border-b border-slate-100 p-2.5 flex flex-wrap items-center gap-3">
                     <button onclick="copySelectedToLogs()" class="bg-indigo-100 text-indigo-700 hover:bg-indigo-200 px-4 py-1.5 rounded-lg text-sm font-bold transition flex items-center gap-1.5 shadow-sm">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" /></svg>
@@ -262,7 +258,7 @@
             editLogUid: null,
             filters: {}, 
             logFilters: {},
-            selectedUids: new Set() // 追蹤被勾選的資料UID
+            selectedUids: new Set()
         };
 
         window.currentSearchTerm = '';
@@ -273,6 +269,20 @@
         };
 
         const generateLogUid = () => 'log_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+        // 新增的自動遞增單號函數
+        const generateNextLogId = () => {
+            let maxId = 0;
+            appState.logs.forEach(log => {
+                if (log.logId && log.logId.startsWith('C')) {
+                    const num = parseInt(log.logId.substring(1), 10);
+                    if (!isNaN(num) && num > maxId) {
+                        maxId = num;
+                    }
+                }
+            });
+            return 'C' + String(maxId + 1).padStart(6, '0');
+        };
 
         function formatJustDate(val) {
             if (!val) return "";
@@ -356,6 +366,7 @@
                         const logObj = { 
                             time: logTimeFormatted, 
                             action: l["動作"] || "", 
+                            logId: l["異動單號"] || "", 
                             target: l["單號對象"] || "", 
                             details: l["詳細內容"] || "", 
                             uid: null, 
@@ -375,7 +386,7 @@
 
                 appState.data = importedData;
                 appState.logs = importedLogs.reverse();
-                appState.selectedUids.clear(); // 清空勾選紀錄
+                appState.selectedUids.clear(); 
                 initSystemView();
             };
             reader.readAsArrayBuffer(file);
@@ -410,7 +421,7 @@
                 const selectedVals = appState.logFilters[col];
                 if (selectedVals && selectedVals.length > 0) {
                     displayLogs = displayLogs.filter(log => {
-                        if (['time', 'action', 'target', 'details'].includes(col)) {
+                        if (['time', 'action', 'logId', 'details'].includes(col)) {
                             return selectedVals.includes(String(log[col] || ""));
                         }
                         return selectedVals.includes(String(log.rowData?.[col] || ""));
@@ -422,7 +433,7 @@
                 displayLogs = displayLogs.filter(log => {
                     return String(log.time || '').toLowerCase().includes(term) ||
                            String(log.action || '').toLowerCase().includes(term) ||
-                           String(log.target || '').toLowerCase().includes(term) ||
+                           String(log.logId || '').toLowerCase().includes(term) ||
                            String(log.details || '').toLowerCase().includes(term) ||
                            STANDARD_HEADERS.some(h => String(log.rowData?.[h] || '').toLowerCase().includes(term));
                 });
@@ -439,7 +450,6 @@
             }
         }
 
-        // Inline Edit (Excel-like) 資料清單處理函式
         window.handleDataInlineEdit = function(uid, field, rawValue) {
             const newValue = rawValue.replace(/\n/g, '').trim();
             const row = appState.data.find(d => d._uid === uid);
@@ -447,11 +457,11 @@
                 const oldValue = row[field];
                 row[field] = newValue;
                 
-                // 新增異動日誌紀錄
                 const timestamp = formatJustDate(new Date());
                 appState.logs.unshift({ 
                     time: timestamp, 
                     action: '修正', 
+                    logId: generateNextLogId(),
                     target: row['保管單號碼'] || '無單號', 
                     details: `[${field}]：${oldValue || '空'}➔${newValue || '空'}`, 
                     uid: row._uid, 
@@ -459,13 +469,11 @@
                     rowData: {...row} 
                 });
 
-                // 更新畫面以套用新的顏色排版等
                 renderTable();
                 renderLogs();
             }
         };
 
-        // Inline Edit (Excel-like) 異動日誌處理函式 (包含同步回清單)
         window.handleLogInlineEdit = function(logUid, field, rawValue, isRowData) {
             const newValue = rawValue.replace(/\n/g, '').trim();
             const log = appState.logs.find(l => l._logUid === logUid);
@@ -485,28 +493,22 @@
             }
             
             if (changed) {
-                // 如果日誌有綁定原始資料 (uid)，則同步更新原資料清單
                 if (log.uid) {
                     const dataRow = appState.data.find(d => d._uid === log.uid);
                     if (dataRow) {
                         if (isRowData) {
                             dataRow[field] = newValue;
-                        } else if (field === 'target') {
-                            dataRow['保管單號碼'] = newValue;
                         }
                     }
-                    // 資料更改了，重繪背景的清單頁面
                     renderTable();
                 }
                 renderLogs();
             }
         };
 
-        // 打勾與 Shift 連選機制
         let lastCheckedIdx = -1;
         window.handleRowCheck = function(e, uid, currentIdx) {
             if (e.shiftKey && lastCheckedIdx !== -1) {
-                // 利用 DOM 中的順序做連選 (不受篩選器亂序影響)
                 const checkboxes = Array.from(document.querySelectorAll('.row-checkbox'));
                 const startNode = checkboxes.find(c => parseInt(c.getAttribute('data-index')) === lastCheckedIdx);
                 const currentNode = checkboxes.find(c => parseInt(c.getAttribute('data-index')) === currentIdx);
@@ -538,7 +540,6 @@
             lastCheckedIdx = currentIdx;
         };
 
-        // 複製已勾選項至異動日誌
         window.copySelectedToLogs = function() {
             if (!appState.selectedUids || appState.selectedUids.size === 0) {
                 alert('請先在操作欄勾選要複製的項目');
@@ -552,6 +553,7 @@
                     appState.logs.unshift({ 
                         time: timestamp, 
                         action: '複製', 
+                        logId: generateNextLogId(),
                         target: row['保管單號碼'] || '', 
                         details: '自清單複製', 
                         uid: row._uid, 
@@ -562,13 +564,12 @@
                 }
             });
             
-            // 清空打勾狀態
             appState.selectedUids.clear();
             const boxes = document.querySelectorAll('.row-checkbox');
             boxes.forEach(b => b.checked = false);
             
             updateStats();
-            renderLogs(); // 更新日誌以供檢視
+            renderLogs(); 
             alert(`✅ 已成功複製 ${copiedCount} 筆資料至異動日誌！`);
         };
 
@@ -778,7 +779,6 @@
                     if (h === "是否盤點") {
                         colorClass = val === 'Y' ? 'text-green-700 font-black' : (val === 'N' ? 'text-red-700 font-black' : 'text-slate-400 font-black');
                     }
-                    // Excel 直覺編輯輸入框設計
                     bodyHtml += `<td class="px-2 py-1.5 border-b border-slate-100 max-w-[120px] ${colorClass}">
                         <div contenteditable="true" onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}" onblur="handleDataInlineEdit('${row._uid}', '${h}', this.innerText)" class="outline-none focus:bg-white focus:ring-2 focus:ring-blue-400 rounded px-1 min-h-[1.25rem] truncate focus:text-clip focus:overflow-visible focus:max-w-none hover:bg-slate-50 transition-colors cursor-text" title="${escapeHTML(val)}">${display}</div>
                     </td>`;
@@ -788,7 +788,6 @@
                 bodyHtml += `
                     <td class="sticky-col px-2 py-1.5 border-b border-slate-100 text-center">
                         <div class="flex justify-center items-center gap-2">
-                            <!-- 已移除原先的編輯按鈕，加入多選 checkbox -->
                             <input type="checkbox" class="row-checkbox w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer" data-uid="${row._uid}" data-index="${rowIndex}" ${isChecked} onclick="handleRowCheck(event, '${row._uid}', ${rowIndex})">
                             <button onclick="confirmDelete('${row._uid}')" class="p-1 text-red-400 hover:bg-red-50 rounded-lg transition" title="刪除"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                         </div>
@@ -806,20 +805,13 @@
             document.getElementById('page1').classList.toggle('hidden', tabId !== 'page1');
             document.getElementById('page2').classList.toggle('hidden', tabId !== 'page2');
             if (tabId === 'page2') renderLogs();
-            if (tabId === 'page1') renderTable(); // 切回清單時，確保同步渲染已被異動的資料
+            if (tabId === 'page1') renderTable(); 
         }
 
         function openAddModal() {
             appState.isNew = true; appState.editUid = 'new_' + Date.now();
             document.getElementById('modalTitle').innerText = "新增保管品項目";
             renderForm({}); document.getElementById('editModal').classList.remove('hidden');
-        }
-
-        function openEditModal(uid) {
-            appState.isNew = false; appState.editUid = uid;
-            const row = appState.data.find(d => d._uid === uid);
-            document.getElementById('modalTitle').innerText = "編輯欄位內容";
-            renderForm(row); document.getElementById('editModal').classList.remove('hidden');
         }
 
         function renderForm(data) {
@@ -852,13 +844,13 @@
             if (appState.isNew) {
                 newValues._uid = appState.editUid;
                 appState.data.push(newValues);
-                appState.logs.unshift({ time: timestamp, action: '新增', target: newValues['保管單號碼'] || '手動建立', details: '手動新增資料', uid: newValues._uid, _logUid: generateLogUid(), rowData: {...newValues} });
+                appState.logs.unshift({ time: timestamp, action: '新增', logId: generateNextLogId(), target: newValues['保管單號碼'] || '手動建立', details: '手動新增資料', uid: newValues._uid, _logUid: generateLogUid(), rowData: {...newValues} });
             } else {
                 const idx = appState.data.findIndex(d => d._uid === appState.editUid), oldData = appState.data[idx], changes = [];
                 STANDARD_HEADERS.forEach(h => { if (oldData[h] !== newValues[h]) changes.push(`[${h}]：${oldData[h]||'空'}➔${newValues[h]||'空'}`); });
                 if (changes.length > 0) {
                     appState.data[idx] = { ...newValues, _uid: appState.editUid };
-                    appState.logs.unshift({ time: timestamp, action: '修正', target: oldData['保管單號碼'] || '無單號', details: changes.join('；'), uid: appState.editUid, _logUid: generateLogUid(), rowData: {...newValues} });
+                    appState.logs.unshift({ time: timestamp, action: '修正', logId: generateNextLogId(), target: oldData['保管單號碼'] || '無單號', details: changes.join('；'), uid: appState.editUid, _logUid: generateLogUid(), rowData: {...newValues} });
                 }
             }
             renderTable(); renderLogs(); closeModal(); if (appState.data.length > 0) initSystemView();
@@ -874,7 +866,7 @@
         function executeDelete() {
             const row = appState.data.find(d => d._uid === pendingDeleteUid);
             appState.data = appState.data.filter(d => d._uid !== pendingDeleteUid);
-            appState.logs.unshift({ time: formatJustDate(new Date()), action: '刪除', target: row['保管單號碼'] || '系統', details: `移除：${row['品名']}`, uid: null, _logUid: generateLogUid(), rowData: {...row} });
+            appState.logs.unshift({ time: formatJustDate(new Date()), action: '刪除', logId: generateNextLogId(), target: row['保管單號碼'] || '系統', details: `移除：${row['品名']}`, uid: null, _logUid: generateLogUid(), rowData: {...row} });
             renderTable(); renderLogs(); closeConfirm();
             if (appState.data.length === 0) {
                 document.getElementById('mainContent').classList.add('hidden');
@@ -887,41 +879,6 @@
         
         let pendingLogDeleteUid = null;
         
-        function openLogEditModal(logUid) {
-            appState.editLogUid = logUid;
-            const logData = appState.logs.find(l => l._logUid === logUid);
-            if(!logData) return;
-            
-            const container = document.getElementById('editLogFormFields');
-            let html = `
-                <div class="space-y-1"><label class="text-xs font-bold text-slate-500 uppercase">異動時間</label><input type="text" name="time" value="${escapeHTML(logData.time)}" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl"></div>
-                <div class="space-y-1"><label class="text-xs font-bold text-slate-500 uppercase">動作 (新增/修正/刪除)</label><input type="text" name="action" value="${escapeHTML(logData.action)}" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl"></div>
-                <div class="space-y-1"><label class="text-xs font-bold text-slate-500 uppercase">單號對象</label><input type="text" name="target" value="${escapeHTML(logData.target)}" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl"></div>
-                <div class="space-y-1"><label class="text-xs font-bold text-slate-500 uppercase">詳細內容</label><input type="text" name="details" value="${escapeHTML(logData.details)}" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl"></div>
-                
-                <div class="col-span-full my-2 border-b border-slate-100"></div>
-                <div class="col-span-full text-sm font-bold text-slate-800 flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" /></svg>
-                    當前快照資料 (選填)
-                </div>
-            `;
-            
-            STANDARD_HEADERS.forEach((h, index) => {
-                const val = logData.rowData?.[h] || "";
-                html += `<div class="space-y-1"><label class="text-xs font-bold text-slate-500 uppercase">${index+1}. ${h}</label>`;
-                if (h === "是否盤點") {
-                    html += `<select name="row_${h}" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"><option value="N" ${val === "N" ? "selected" : ""}>N</option><option value="Y" ${val === "Y" ? "selected" : ""}>Y</option></select>`;
-                } else if (DATE_FIELDS.includes(h)) {
-                    html += `<input type="date" name="row_${h}" value="${val.replace(/\//g, '-')}" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl">`;
-                } else {
-                    html += `<input type="text" name="row_${h}" value="${escapeHTML(val)}" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl">`;
-                }
-                html += `</div>`;
-            });
-            container.innerHTML = html;
-            document.getElementById('editLogModal').classList.remove('hidden');
-        }
-
         function handleLogFormSubmit(e) {
             e.preventDefault();
             const formData = new FormData(e.target);
@@ -965,7 +922,7 @@
             
             const getLogOptionsList = (col) => {
                 return [...new Set(appState.logs.map(l => {
-                    if (['time', 'action', 'target', 'details'].includes(col)) return String(l[col] || "");
+                    if (['time', 'action', 'logId', 'details'].includes(col)) return String(l[col] || "");
                     return String(l.rowData?.[col] || "");
                 }))].sort();
             };
@@ -1029,7 +986,7 @@
             let hHtml = `<tr>`;
             hHtml += buildTh('異動時間', 'time', 'time');
             hHtml += buildTh('動作', 'action', 'action');
-            hHtml += buildTh('單號', 'target', 'target');
+            hHtml += buildTh('異動單號', 'logId', 'logId'); // 修改此處：移除單號對象，新增異動單號
             hHtml += buildTh('詳細', 'details', 'details');
             hHtml += buildTh('定位', null, 'locate');
             
@@ -1045,7 +1002,7 @@
                 const selectedVals = appState.logFilters[col];
                 if (selectedVals && selectedVals.length > 0) {
                     displayLogs = displayLogs.filter(log => {
-                        if (['time', 'action', 'target', 'details'].includes(col)) {
+                        if (['time', 'action', 'logId', 'details'].includes(col)) {
                             return selectedVals.includes(String(log[col] || ""));
                         }
                         return selectedVals.includes(String(log.rowData?.[col] || ""));
@@ -1058,7 +1015,7 @@
                 displayLogs = displayLogs.filter(log => {
                     return String(log.time || '').toLowerCase().includes(term) ||
                            String(log.action || '').toLowerCase().includes(term) ||
-                           String(log.target || '').toLowerCase().includes(term) ||
+                           String(log.logId || '').toLowerCase().includes(term) ||
                            String(log.details || '').toLowerCase().includes(term) ||
                            STANDARD_HEADERS.some(h => String(log.rowData?.[h] || '').toLowerCase().includes(term));
                 });
@@ -1073,11 +1030,10 @@
             body.innerHTML = displayLogs.map(log => {
                 const displayTime = formatJustDate(log.time);
                 
-                // 日誌也全部改為 Inline Edit，並移除編輯按鈕
                 let rHtml = `<tr class="hover:bg-slate-50">
                     <td class="px-2 py-1.5 font-mono text-slate-400"><div contenteditable="true" onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}" onblur="handleLogInlineEdit('${log._logUid}', 'time', this.innerText, false)" class="outline-none focus:bg-white focus:ring-2 focus:ring-blue-400 rounded px-1 min-h-[1.25rem] hover:bg-white transition-colors cursor-text">${escapeHTML(displayTime)}</div></td>
                     <td class="px-2 py-1.5 font-bold"><div contenteditable="true" onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}" onblur="handleLogInlineEdit('${log._logUid}', 'action', this.innerText, false)" class="outline-none focus:bg-white focus:ring-2 focus:ring-blue-400 rounded px-1 min-h-[1.25rem] hover:bg-white transition-colors cursor-text ${log.action === '刪除' ? 'text-red-600' : 'text-blue-600'}">${escapeHTML(log.action)}</div></td>
-                    <td class="px-2 py-1.5 font-bold"><div contenteditable="true" onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}" onblur="handleLogInlineEdit('${log._logUid}', 'target', this.innerText, false)" class="outline-none focus:bg-white focus:ring-2 focus:ring-blue-400 rounded px-1 min-h-[1.25rem] hover:bg-white transition-colors cursor-text">${escapeHTML(log.target)}</div></td>
+                    <td class="px-2 py-1.5 font-bold"><div contenteditable="true" onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}" onblur="handleLogInlineEdit('${log._logUid}', 'logId', this.innerText, false)" class="outline-none focus:bg-white focus:ring-2 focus:ring-blue-400 rounded px-1 min-h-[1.25rem] hover:bg-white transition-colors cursor-text">${escapeHTML(log.logId || "")}</div></td>
                     <td class="px-2 py-1.5 text-slate-500 max-w-[150px]"><div contenteditable="true" onkeydown="if(event.key==='Enter'){event.preventDefault(); this.blur();}" onblur="handleLogInlineEdit('${log._logUid}', 'details', this.innerText, false)" class="outline-none focus:bg-white focus:ring-2 focus:ring-blue-400 rounded px-1 min-h-[1.25rem] truncate focus:text-clip focus:overflow-visible focus:max-w-none hover:bg-white transition-colors cursor-text" title="${escapeHTML(log.details)}">${escapeHTML(log.details)}</div></td>
                     <td class="px-2 py-1.5 text-center">${log.uid ? `<button onclick="locateItem('${log.uid}')" class="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded font-bold">尋找</button>` : '-'}</td>`;
                 
@@ -1088,7 +1044,6 @@
                 rHtml += `
                     <td class="sticky-col px-2 py-1.5 border-b border-slate-100 text-center">
                         <div class="flex justify-center gap-1">
-                            <!-- 已移除原先日誌編輯按鈕 -->
                             <button onclick="confirmLogDelete('${log._logUid}')" class="p-1 text-red-400 hover:bg-red-50 rounded-lg transition" title="刪除"><svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
                         </div>
                     </td>`;
@@ -1101,7 +1056,7 @@
         function exportToExcel() {
             const listWs = XLSX.utils.json_to_sheet(appState.data.map(({ _uid, ...r }) => r));
             const logWs = XLSX.utils.json_to_sheet(appState.logs.map(l => {
-                let o = { "異動時間": formatJustDate(l.time), "動作": l.action, "單號對象": l.target, "詳細內容": l.details };
+                let o = { "異動時間": formatJustDate(l.time), "動作": l.action, "異動單號": l.logId || "", "詳細內容": l.details };
                 if (l.rowData) STANDARD_HEADERS.forEach(h => o[h] = l.rowData[h] || "");
                 return o;
             }));
@@ -1110,10 +1065,6 @@
             XLSX.utils.book_append_sheet(wb, logWs, "異動日誌");
             XLSX.writeFile(wb, `保管品系統備份_${new Date().toISOString().slice(0,10)}.xlsx`);
         }
-
-        // ====================================================
-        // Google Apps Script (GAS) 雲端連線功能 (改善了巢狀展開邏輯)
-        // ====================================================
 
         async function loadFromGAS() {
             if (!GAS_URL) {
@@ -1139,6 +1090,7 @@
                         let log = {
                             time: logTimeFormatted,
                             action: flatLog["動作"] || flatLog.action || "",
+                            logId: flatLog["異動單號"] || flatLog.logId || "",
                             target: flatLog["單號對象"] || flatLog.target || "",
                             details: flatLog["詳細內容"] || flatLog.details || "",
                             uid: flatLog.uid || "",
@@ -1157,7 +1109,7 @@
                     });
                     
                     if (appState.data.length > 0 || appState.logs.length > 0) {
-                        appState.selectedUids.clear(); // 清空勾選紀錄
+                        appState.selectedUids.clear(); 
                         initSystemView();
                         alert('✅ 雲端資料載入成功！');
                     } else {
@@ -1192,7 +1144,7 @@
 
             try {
                 const flattenedLogs = appState.logs.map(l => {
-                    let o = { "異動時間": formatJustDate(l.time), "動作": l.action, "單號對象": l.target, "詳細內容": l.details, "uid": l.uid, "_logUid": l._logUid };
+                    let o = { "異動時間": formatJustDate(l.time), "動作": l.action, "異動單號": l.logId || "", "詳細內容": l.details, "uid": l.uid, "_logUid": l._logUid };
                     if (l.rowData) STANDARD_HEADERS.forEach(h => o[h] = l.rowData[h] || "");
                     return o;
                 });
@@ -1223,7 +1175,6 @@
         }
 
         updateStats();
-
     </script>
 </body>
 </html>
